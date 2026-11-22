@@ -157,9 +157,10 @@ The review's agents MUST have no credential that can approve or write.
 
 ## Execution
 
-| Phase | Model | Gate                                                                                                                                                                 |
-| ----- | ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1     | opus  | A block redefining a row's id fails the parse gate's drift case, one too long or out of shape fails mdsmith's; the review section rewritten locally passes its gates |
+| Phase | Model  | Gate                                                                                                                                                                 |
+| ----- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1     | opus   | A block redefining a row's id fails the parse gate's drift case, one too long or out of shape fails mdsmith's; the review section rewritten locally passes its gates |
+| 2     | sonnet | Main's review bundle shows no requirement of the four sections changed, and mdsmith, the gates and the local review pass                                             |
 
 ## Phases
 
@@ -186,6 +187,7 @@ footer: |
 | --- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | ✅     | [Every reader takes a requirement written as a block](phase-1.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 |     | ↳      | Every reader of the SRS now takes a requirement written as a block beside the tables: the srs crate's parser, which every gate shares, and the evaluation's derived cases. No requirement changes, and no scenario comes off @pending. Rewritten as blocks on a scratch branch, the review section passed its gates and the local review, and its bundle showed no requirement changed. The srs kind's cap rises to 700 lines, a requirement may hold 50, six longer ones listed until each is split, and mdsmith checks a block's shape. |
+| 2   | 🔳     | [§2, §5, §5a and §7 written as blocks](phase-2.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 <?/catalog?>
 
 ## Acceptance Criteria
