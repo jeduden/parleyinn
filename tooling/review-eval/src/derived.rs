@@ -242,23 +242,20 @@ fn first_requirement(text: &str) -> Option<(String, String, String)> {
 
 /// The first block of a section with a priority, outside a code fence:
 /// its lines from its heading, one that is a requirement id, to its
-/// last line of text before the next heading or table, and its id.
+/// last line of text before the next heading or table outside a code
+/// fence, and its id. A fence inside a block is part of its text, as
+/// the srs crate reads it.
 fn first_block(text: &str) -> Option<(String, String)> {
     let lines: Vec<&str> = text.lines().collect();
     unfenced(text).find_map(|(i, line)| {
-        let rest = line.trim_start_matches('#');
-        let id = rest.strip_prefix(' ')?.trim();
-        if !(1..=6).contains(&(line.len() - rest.len()))
-            || !srs_id(id)
-            || id.starts_with(OPEN_QUESTION)
-        {
+        let id = heading(line)?;
+        if !block_id(id) || id.starts_with(OPEN_QUESTION) {
             return None;
         }
-        let body: Vec<&str> = lines[i + 1..]
-            .iter()
-            .take_while(|l| !l.starts_with('#') && !l.trim_start().starts_with('|'))
-            .copied()
-            .collect();
+        let stop = unfenced(text)
+            .find(|(j, l)| *j > i && ends_block(l))
+            .map_or(lines.len(), |(j, _)| j);
+        let body = &lines[i + 1..stop];
         let end = body.iter().rposition(|l| !l.trim().is_empty())? + 1;
         body[..end]
             .iter()
@@ -270,6 +267,29 @@ fn first_block(text: &str) -> Option<(String, String)> {
                 )
             })
     })
+}
+
+/// The text of `line` when it is an ATX heading, as the srs crate reads
+/// one: one to six `#` and a space or the line's end.
+fn heading(line: &str) -> Option<&str> {
+    let rest = line.trim_start_matches('#');
+    let level = line.len() - rest.len();
+    ((1..=6).contains(&level) && (rest.is_empty() || rest.starts_with(' '))).then(|| rest.trim())
+}
+
+/// Whether `line`, outside a code fence, ends a block: a heading or a
+/// line of a table.
+fn ends_block(line: &str) -> bool {
+    heading(line).is_some() || line.trim_start().starts_with('|')
+}
+
+/// Whether `word` is an id the srs crate reads a block under: a
+/// requirement id with two digits.
+fn block_id(word: &str) -> bool {
+    srs_id(word)
+        && word
+            .split_once('-')
+            .is_some_and(|(_, digits)| digits.len() == 2)
 }
 
 /// The lines of `text` outside fenced code blocks, each with its index.

@@ -432,6 +432,60 @@ fn a_requirement_inside_a_code_fence_is_none() {
 }
 
 #[test]
+fn a_fence_inside_a_block_is_part_of_its_text() {
+    let block = "## REC-01\n\n- Pri: P0\n\nText.\n```\n## REC-02\n| A |\n```\nMore.\n";
+
+    assert_eq!(
+        first_block(&format!("{block}\n## Next\n")),
+        Some((block.to_owned(), "REC-01".to_owned()))
+    );
+}
+
+#[test]
+fn a_heading_the_srs_crate_reads_no_block_under_opens_none() {
+    let block = "## SEC-02\n\n- Pri: P1\n\nIt MUST refuse.\n";
+
+    assert_eq!(
+        first_block(&format!(
+            "## SEC-100\n\n- Pri: P0\n\nThree digits.\n\n{block}"
+        )),
+        Some((block.to_owned(), "SEC-02".to_owned()))
+    );
+    // A line of hashes with no space after them is no heading, so it
+    // ends no block.
+    let hashed = "## SEC-03\n\n- Pri: P2\n\nText.\n#tag\nMore.\n";
+    assert_eq!(
+        first_block(hashed),
+        Some((hashed.to_owned(), "SEC-03".to_owned()))
+    );
+}
+
+#[test]
+fn heading_reads_one_to_six_hashes_and_a_space_or_the_end() {
+    assert_eq!(heading("## SEC-02 "), Some("SEC-02"));
+    assert_eq!(heading("###### Deep"), Some("Deep"));
+    assert_eq!(heading("#"), Some(""));
+    assert_eq!(heading("####### Too deep"), None);
+    assert_eq!(heading("#tag"), None);
+    assert_eq!(heading("Text"), None);
+}
+
+#[test]
+fn a_heading_or_a_table_line_ends_a_block() {
+    assert!(ends_block("## Next"));
+    assert!(ends_block("  | A |"));
+    assert!(!ends_block("#tag"));
+    assert!(!ends_block("Text with a | in it."));
+}
+
+#[test]
+fn a_block_id_is_a_requirement_id_with_two_digits() {
+    assert!(block_id("LANE-01"));
+    assert!(!block_id("LANE-123"));
+    assert!(!block_id("I2"));
+}
+
+#[test]
 fn fence_reads_a_run_of_three_or_more_backticks_or_tildes() {
     assert_eq!(fence("```rust"), Some((b'`', 3)));
     assert_eq!(fence("~~~~"), Some((b'~', 4)));
