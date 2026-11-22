@@ -439,8 +439,8 @@ pub(super) fn gate_cases() -> Vec<Case> {
             "appendix_b_matches_the_traces",
             Injection::replace(
                 "docs/srs/10-engineering-quality.md",
-                "| ENG-25 | P1  |",
-                "| ENG-25 | P2  |",
+                "### ENG-25\n\n- Pri: P1\n",
+                "### ENG-25\n\n- Pri: P2\n",
             ),
             cargo_test("srs", "gates", "appendix_b_matches_the_traces"),
             "Appendix B's requirement counts",
@@ -468,8 +468,8 @@ pub(super) fn parse_cases() -> Vec<Case> {
             "specification_parses",
             Injection::replace(
                 "docs/srs/10-engineering-quality.md",
-                "| ENG-25 | P1  |",
-                "| ENG-24 | P1  |",
+                "### ENG-25\n",
+                "### ENG-24\n",
             ),
             cargo_test("srs", "gates", "specification_parses"),
             "ENG-24 already defined at",
@@ -484,12 +484,12 @@ pub(super) fn parse_cases() -> Vec<Case> {
     ]
 }
 
-/// The drift the parse gate catches in a requirement written as a
-/// block: a block reads as a row does, so one that redefines a row's id
-/// fails the gate as a second row would.
+/// The drift the parse gate catches across sections: a requirement
+/// written as a block in a new section, with an id §10 defines, fails
+/// the gate as a second one in §10 would.
 pub(super) fn block_parse_cases() -> Vec<Case> {
     vec![case(
-        "a requirement block redefining a row's id",
+        "a requirement block redefining another section's id",
         "specification_parses",
         Injection::create(
             "docs/srs/10b-drift.md",
