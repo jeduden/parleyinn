@@ -9,7 +9,7 @@ description: >-
 tools: Read, Grep, Glob
 model: haiku
 effort: low
-maxTurns: 20
+maxTurns: 30
 generalist: review-spec
 ---
 # Language specialist: Markdown
