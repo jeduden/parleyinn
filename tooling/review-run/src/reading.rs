@@ -193,8 +193,10 @@ pub fn diff_file(stem: &str) -> String {
 /// whole diff under `workdir`: the ranges of it no read covered, or that
 /// its diff is not there or does not read; none when it read every line
 /// of it, an empty diff having none. Every specialist, and every part,
-/// is told to read its diff, so one not found is never a whole review. Only a read of that very file counts: a relative path
-/// under the work directory, or an absolute one under it as named or as
+/// is told to read its diff, so one not found is never a whole review.
+/// Only a read of that very file counts: one whose path the file system
+/// resolves to it ([`resolved`]), or one naming it, relative paths taken
+/// under the work directory, under the work directory as named or as
 /// resolved ([`coverage::unread`]).
 #[must_use]
 pub fn uncovered(workdir: &Path, stem: &str, reads: &[ReadCall]) -> Option<String> {
@@ -217,7 +219,8 @@ pub fn uncovered(workdir: &Path, stem: &str, reads: &[ReadCall]) -> Option<Strin
         .flatten()
         .collect();
     let roots: Vec<&Path> = roots.iter().map(PathBuf::as_path).collect();
-    let unread = coverage::unread(reads, &roots, &rel, total);
+    let reads = resolved(reads, workdir, &path, &rel);
+    let unread = coverage::unread(&reads, &roots, &rel, total);
     (!unread.is_empty()).then(|| {
         let held = if total == 1 { "line" } else { "lines" };
         format!(
@@ -225,6 +228,31 @@ pub fn uncovered(workdir: &Path, stem: &str, reads: &[ReadCall]) -> Option<Strin
             ranges(&unread)
         )
     })
+}
+
+/// `reads`, each whose path, a relative one taken under `workdir`, the
+/// file system resolves to `diff` named by `rel`, the diff's path under
+/// `workdir`. So a read that climbs back out of the pull request's tree
+/// to the diff covers it, and a link in that tree, which the file system
+/// follows before the `..` after it, never makes a file of the same name
+/// stand in for it.
+fn resolved(reads: &[ReadCall], workdir: &Path, diff: &Path, rel: &str) -> Vec<ReadCall> {
+    let diff = fs::canonicalize(diff).ok();
+    reads
+        .iter()
+        .map(|read| {
+            let at = fs::canonicalize(workdir.join(&read.path)).ok();
+            let path = if diff.is_some() && at == diff {
+                rel.to_owned()
+            } else {
+                read.path.clone()
+            };
+            ReadCall {
+                path,
+                ..read.clone()
+            }
+        })
+        .collect()
 }
 
 /// `ranges`, 1-based and inclusive, said: `line 7`, `lines 1-40, 81`.

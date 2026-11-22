@@ -205,6 +205,46 @@ fn a_read_under_the_work_directory_s_resolved_name_covers_its_diff() {
 }
 
 #[test]
+fn a_read_whose_path_the_file_system_resolves_to_the_diff_covers_it() {
+    // A specialist that has looked through the pull request's tree may
+    // climb back out of it to its diff: that is a read of its diff.
+    let dir = with_diff("lang-rust", 3);
+    fs::create_dir_all(dir.path().join("pr-head/docs")).unwrap();
+    let absolute = dir
+        .path()
+        .join("pr-head/docs/../../review/diffs/lang-rust.diff");
+    let reads = [
+        reading("pr-head/../review/diffs/lang-rust.diff", None, Some(1)),
+        reading(absolute.to_str().unwrap(), Some(2), None),
+    ];
+
+    assert_eq!(uncovered(dir.path(), "lang-rust", &reads), None);
+}
+
+#[test]
+fn a_climb_through_a_link_in_the_pull_request_s_tree_covers_nothing() {
+    // The file system follows a link before the `..` after it, so a
+    // link the pull request plants can make a path that reads as the
+    // diff's name a file of the same name in its own tree.
+    let dir = with_diff("lang-rust", 1);
+    let head = dir.path().join("pr-head");
+    fs::create_dir_all(head.join("a/b/c")).unwrap();
+    fs::create_dir_all(head.join("a/review/diffs")).unwrap();
+    fs::write(head.join("a/review/diffs/lang-rust.diff"), "+x\n").unwrap();
+    std::os::unix::fs::symlink(head.join("a/b/c"), head.join("link")).unwrap();
+    let reads = [reading(
+        "pr-head/link/../../review/diffs/lang-rust.diff",
+        None,
+        None,
+    )];
+
+    assert_eq!(
+        uncovered(dir.path(), "lang-rust", &reads).unwrap(),
+        "its log shows no Read of line 1 of review/diffs/lang-rust.diff, of 1 line"
+    );
+}
+
+#[test]
 fn each_range_no_read_covered_is_named() {
     let dir = with_diff("lang-rust.2", 30);
     let reads = [
