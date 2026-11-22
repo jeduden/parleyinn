@@ -183,6 +183,7 @@ fn late_cases() -> Vec<Case> {
         review_tree_place_cases(),
         block_parse_cases(),
         block_length_cases(),
+        block_shape_cases(),
     ]
     .concat()
 }

@@ -533,6 +533,58 @@ pub(super) fn block_length_cases() -> Vec<Case> {
     )]
 }
 
+/// The drifts mdsmith's schema for the srs kind catches in a
+/// requirement written as a block before the heading of §10.4: each a
+/// shape the srs crate reads, broken.
+pub(super) fn block_shape_cases() -> Vec<Case> {
+    let shape = |name, block, want| {
+        case(
+            name,
+            "mdsmith check",
+            Injection::replace(
+                "docs/srs/10-engineering-quality.md",
+                "\n## 10.4 Process\n",
+                block,
+            ),
+            mdsmith(),
+            want,
+        )
+    };
+    vec![
+        shape(
+            "a requirement block whose text runs on from its fields",
+            "\n### ENG-99\n\n- Pri: P1\n- Ver: T\nIt MUST hold.\n\n## 10.4 Process\n",
+            "missing required content \"paragraph\"",
+        ),
+        shape(
+            "a requirement block with a table under its text",
+            "\n### ENG-99\n\n- Pri: P1\n- Ver: T\n\nIt MUST hold.\n\n\
+             | A   |\n| --- |\n| a   |\n\n## 10.4 Process\n",
+            "unexpected content \"table\"",
+        ),
+        shape(
+            "a requirement block at its section's level",
+            "\n## ENG-99\n\n- Pri: P1\n- Ver: T\n\nIt MUST hold.\n\n## 10.4 Process\n",
+            "ENG-99: got h2, expected h3",
+        ),
+        shape(
+            "a requirement block whose fields are a loose list",
+            "\n### ENG-99\n\n- Pri: P1\n\n- Ver: T\n\nIt MUST hold.\n\n## 10.4 Process\n",
+            "section \"### ENG-99\" has too many paragraphs (3 > 1)",
+        ),
+        shape(
+            "a requirement block whose fields are marked with asterisks",
+            "\n### ENG-99\n\n* Pri: P1\n* Ver: T\n\nIt MUST hold.\n\n## 10.4 Process\n",
+            "unordered list uses asterisk; configured style is dash",
+        ),
+        shape(
+            "a requirement block whose fields are numbered",
+            "\n### ENG-99\n\n1. Pri: P1\n2. Ver: T\n\nIt MUST hold.\n\n## 10.4 Process\n",
+            "list ordered=true does not match required ordered=false",
+        ),
+    ]
+}
+
 /// The drifts the persona gates catch between §2.5, Appendix C and the
 /// persona agents.
 pub(super) fn persona_cases() -> Vec<Case> {
