@@ -1,7 +1,7 @@
 ---
 n: 2
 title: "§2, §5, §5a and §7 written as blocks"
-status: "🔳"
+status: "✅"
 result: false
 ---
 # Phase 2: §2, §5, §5a and §7 written as blocks
