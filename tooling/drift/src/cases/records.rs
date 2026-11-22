@@ -566,6 +566,22 @@ pub(super) fn coverage_list_cases() -> Vec<Case> {
     )]
 }
 
+/// The drift the recall scenario's reader of §9.2 catches: a parameter
+/// the list gives a tool that the tool does not declare.
+pub(super) fn tool_list_cases() -> Vec<Case> {
+    vec![case(
+        "a parameter §9.2 gives event_get that event_get does not declare",
+        "RCL-01",
+        Injection::replace(
+            "docs/srs/09-interfaces.md",
+            "  - Parameters: `address` (RCL-08), `scope` (default `run`), `room`, `cursor`\n",
+            "  - Parameters: `address` (RCL-08), `scope` (default `run`), `room`, `cursor`,\n    `limit`\n",
+        ),
+        scenario("RCL-01"),
+        "event_get does not declare limit, which section 9.2 specifies",
+    )]
+}
+
 /// The drifts mdsmith's schema for the srs kind catches in a
 /// requirement written as a block before the heading of §10.4: each a
 /// shape the srs crate reads, broken.

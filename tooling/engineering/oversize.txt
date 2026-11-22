@@ -20,5 +20,5 @@ features/lane.feature 596
 tooling/engineering/src/trusted_text.rs 1038
 tooling/scenario/tests/bdd/assumptions.rs 1297
 tooling/scenario/tests/bdd/erasure.rs 1070
-tooling/scenario/tests/bdd/recall.rs 1043
+tooling/scenario/tests/bdd/recall.rs 1038
 tooling/testkit/src/boundary/tests.rs 1015
