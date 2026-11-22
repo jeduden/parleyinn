@@ -1,10 +1,12 @@
 //! Pipe tables read from a Markdown document, and the code fences
 //! that hide a table quoted inside them.
 
-/// One pipe table: its header cells and its body rows.
+/// One pipe table: its header cells, the line its header sits on, and
+/// its body rows.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Table {
     pub header: Vec<String>,
+    pub line: usize,
     pub rows: Vec<Row>,
 }
 
@@ -39,6 +41,7 @@ pub fn tables(body: &str) -> Vec<Table> {
 
         let mut table = Table {
             header: split_row(trimmed),
+            line: i + 1,
             rows: Vec::new(),
         };
         i += 2;

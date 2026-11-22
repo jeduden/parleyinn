@@ -20,7 +20,7 @@ fn an_srs_that_does_not_read_fails_the_review_before_any_agent_runs() {
 
     assert_eq!(code, EXIT_FAILURE);
     assert!(out.starts_with("failed="), "{out}");
-    assert!(err.contains("malformed requirement id"), "{err}");
+    assert!(err.contains("a requirement table"), "{err}");
     assert!(host.agents().is_empty());
 }
 

@@ -4,21 +4,21 @@ use testkit::TempDir;
 
 use super::*;
 
-const TABLE: &str = "| ID | Pri | Requirement | Ver | Traces |\n|---|---|---|---|---|\n";
-
-fn srs(dir: &Path, rows: &str) {
+fn srs(dir: &Path, body: &str) {
     fs::create_dir_all(dir.join(SRS)).unwrap();
-    fs::write(dir.join(SRS).join("10-x.md"), format!("{TABLE}{rows}")).unwrap();
+    fs::write(dir.join(SRS).join("10-x.md"), body).unwrap();
+}
+
+/// One requirement, written as a block.
+fn block(id: &str) -> String {
+    format!("## {id}\n\n- Pri: P0\n- Ver: T\n- Traces: I2\n\nGate.\n")
 }
 
 #[test]
 fn the_ids_are_main_s_and_the_pull_request_s_and_the_invariants() {
     let dir = TempDir::new().unwrap();
-    srs(dir.path(), "| ENG-28 | P0 | Gate. | T | I2 |\n");
-    srs(
-        &dir.path().join(PR_HEAD),
-        "| ENG-33 | P0 | New. | T | I2 |\n",
-    );
+    srs(dir.path(), &block("ENG-28"));
+    srs(&dir.path().join(PR_HEAD), &block("ENG-33"));
 
     let got = ids(dir.path()).unwrap();
 
@@ -39,10 +39,10 @@ fn an_srs_that_does_not_read_fails() {
     let dir = TempDir::new().unwrap();
     srs(
         &dir.path().join(PR_HEAD),
-        "| eng-1 | P0 | Bad. | T | I2 |\n",
+        "| ID | Pri | Requirement | Ver | Traces |\n|---|---|---|---|---|\n| ENG-28 | P0 | Gate. | T | I2 |\n",
     );
 
     let err = ids(dir.path()).unwrap_err();
 
-    assert!(err.contains("malformed requirement id"), "{err}");
+    assert!(err.contains("a requirement table"), "{err}");
 }

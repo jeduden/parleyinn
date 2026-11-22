@@ -60,9 +60,9 @@ fn contains_names_the_file_and_the_text() {
 }
 
 #[test]
-fn requirement_reads_one_row_or_says_what_is_missing() {
-    let row = "| ID | Pri | Requirement | Ver |\n|---|---|---|---|\n| ENG-18 | P0 | Text. | I |\n";
-    let (_dir, c) = checkout(&[("docs/srs/10.md", row)]);
+fn requirement_reads_one_or_says_what_is_missing() {
+    let block = "## ENG-18\n\n- Pri: P0\n- Ver: I\n\nText.\n";
+    let (_dir, c) = checkout(&[("docs/srs/10.md", block)]);
 
     assert_eq!(c.requirement("ENG-18").unwrap().text, "Text.");
     assert_eq!(
@@ -78,7 +78,7 @@ fn requirement_reads_one_row_or_says_what_is_missing() {
         broken
             .requirement("ENG-18")
             .unwrap_err()
-            .contains("malformed requirement id")
+            .contains("a requirement table")
     );
 }
 
