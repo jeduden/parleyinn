@@ -172,6 +172,7 @@ The review's agents MUST have no credential that can approve or write.
 | 8     | sonnet | The questions are a list, word for word; ASM-09 passes                                                                                                               |
 | 9     | sonnet | Four tables are lists, word for word; the gates pass                                                                                                                 |
 | 10    | sonnet | The commands are a list, word for word; mdsmith passes                                                                                                               |
+| 11    | sonnet | Appendix B is a list, word for word; its gate passes                                                                                                                 |
 
 ## Phases
 
@@ -216,6 +217,7 @@ footer: |
 |     | ↳      | The reference architecture's 6 components and 10 design decisions, the store's 9 tables of §8.2 and Appendix A's 45 concerns are each a list item, word for word as their tables held them, their other columns fields under each. Their widest rows held 741, 1,178, 564 and 503 characters. No requirement changes, and no scenario comes off @pending.                                                                                                                                                                                 |
 | 10  | ✅     | [The command-line interface written as a list](phase-10.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 |     | ↳      | The 83 commands of §9.5 are each a list item, word for word as the table held them, their purposes one sentence a line at 80 columns. The section falls from 134,889 bytes in 140 lines to 26,179 in 384, where each row was padded to 1,545 characters. The srs kind's line length is stern, so only a word may run past 80 columns. No requirement changes, and no scenario comes off @pending.                                                                                                                                         |
+| 11  | ✅     | [Appendix B written as a list](phase-11.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 <?/catalog?>
 
 ## Acceptance Criteria
