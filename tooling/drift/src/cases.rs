@@ -182,6 +182,7 @@ fn late_cases() -> Vec<Case> {
         context::review_consent_cases(),
         review_tree_place_cases(),
         block_parse_cases(),
+        block_length_cases(),
     ]
     .concat()
 }
