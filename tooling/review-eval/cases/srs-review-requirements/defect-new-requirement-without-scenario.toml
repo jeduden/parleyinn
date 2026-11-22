@@ -9,7 +9,7 @@
 # the section's or a derived case's once the section is on main.
 component = "srs-review-requirements"
 kind = "defect"
-title = "a requirement row added with no scenario"
+title = "a requirement added with no scenario"
 
 [[create]]
 file = "docs/srs/10b-review-requirements.md"
@@ -21,12 +21,16 @@ summary: >-
 ---
 # Review notes
 
-This file is part of ParleyInn. The table lists: **ID** · **Pri** ·
-**Requirement** · **Ver** (verification method).
+This file is part of ParleyInn. Each requirement is a heading with its id,
+then its priority (Pri) and verification method (Ver) as a list, then its
+text, one sentence a line.
 
-| ID     | Pri | Requirement                                                   | Ver |
-| ------ | --- | ------------------------------------------------------------- | --- |
-| ENG-36 | P0  | The review MUST record each of its runs in the audit log.     | T   |
+## ENG-36
+
+- Pri: P0
+- Ver: T
+
+The review MUST record each of its runs in the audit log.
 '''
 
 [expect]
