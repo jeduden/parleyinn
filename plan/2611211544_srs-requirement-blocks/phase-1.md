@@ -20,7 +20,8 @@ field, a field twice, no field, no text or a malformed trace is
 malformed, at its line. A row and a block that share an id are an id
 defined twice. A unit test of the derived cases: a section whose first
 requirement is a block gets the defect case that adds a MUST to it,
-not the case of excluded terms.
+not the case of excluded terms. A drift case writes a block of 51
+lines before §10.4's heading, which `mdsmith check .` passes.
 
 GREEN. A `block` module of the `srs` crate reads the blocks of a
 document, and `parse` returns its rows and blocks in the document's
@@ -28,12 +29,15 @@ order. `derived.rs` finds a section's first requirement as a row or
 as a block, and its defect case adds the MUST on a line of its own
 after the block's text. The testing page says how a requirement is
 written, and the srs kind's cap in `.mdsmith.yml` rises to 700 lines,
-the stakeholder's ruling.
+the stakeholder's ruling. The srs kind caps a requirement at 50 lines
+through mdsmith's `max-section-length`, the six longer ones listed at
+their length, the stakeholder's ruling of 22 November 2026.
 
 Gate. A drift case creates a section holding a block with ENG-25's
 id, which §10's table defines, and the parse gate fails naming it.
-Then, on a scratch branch only, the review section is rewritten as
-blocks, and each of these is recorded in the handoff:
+The drift case of a block of 51 lines fails `mdsmith check .`, naming
+it. Then, on a scratch branch only, the review section is rewritten
+as blocks, and each of these is recorded in the handoff:
 
 - `mdsmith check .` passes;
 - the scenario gate, the srs gates, the cucumber scenarios `@ENG-28`
@@ -42,6 +46,10 @@ blocks, and each of these is recorded in the handoff:
 - `review-eval run --component srs-review-requirements` passes its
   derived cases on the rewritten tree;
 - `scripts/review-local.sh` approves.
+
+With every section rewritten on a scratch tree, `mdsmith check .`
+passes under the cap, and fails with any listed length lowered by
+one.
 
 The rewrite is a mechanical edit made outside the repository. Main's
 bundle proves each one, so no tool of the repository writes blocks.
