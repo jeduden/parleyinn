@@ -45,30 +45,263 @@ be verified in milestone M0 (§12) and re-verified by contract tests on every
 supported Claude Code release (ENG-17). If an assumption fails, the listed
 requirements are re-planned.
 
-| ID     | Assumption                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | Evidence so far                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Verified in | Affects                  |
-| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- | ------------------------ |
-| ASM-01 | Hook inputs include `session_id`, `transcript_path`, `cwd`, `hook_event_name`; `SessionStart` adds `source` ∈ {`startup`, `resume`, `clear`, `compact`, `fork`}; `PreCompact` adds `trigger` and `custom_instructions`; `PostCompact` adds `trigger` and `compact_summary`; `UserPromptSubmit` adds `prompt`; a `SessionStart` with `source` = `resume` (a harness resume, by `--resume` or `--continue`) carries the resumed harness session's `session_id`, and one with `fork` or `clear` a new one                                                                                                                                                                                                       | Verified on Claude Code 2.1.296 by S1's recorded hook inputs; `fork` was undocumented                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | S1          | §9.1, REC-02             |
-| ASM-02 | `SessionStart` (every `source`), `UserPromptSubmit` and `PostToolUse` hooks can return `additionalContext`, and the model reads it; `PreCompact` and `PostCompact` cannot, as the harness rejects their `hookSpecificOutput`, but on a manual compaction it repeats each `PreCompact` and `PostCompact` hook's output, accepted or rejected, in command output the model reads, and appends `PreCompact`'s plain output to the compaction's instructions; with a nonzero exit status their stderr reaches the model the same way, while with exit status 0 no hook's stderr does; on a harness resume it drops a `SessionStart` `additionalContext` equal to one in the transcript since its last compaction | Re-planned after S1 on Claude Code 2.1.296: recorded transcripts and nonce probes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | S1          | INJ-*, §9.1              |
-| ASM-03 | Transcripts are JSONL files under `~/.claude/projects/<transcript-dir>/`, one per harness session, with subagent transcripts under `<session_id>/subagents/`, each with a `.meta.json` beside it naming its agent type; a fork or `/clear` starts a new transcript, a fork repeating the earlier lines with their `uuid`s                                                                                                                                                                                                                                                                                                                                                                                    | Verified on Claude Code 2.1.296 by S3's recorded tree                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | S3          | REC-01..06               |
-| ASM-04 | Transcripts are append-only in every flow recorded: a resume, a compaction, a rewind and a partial compaction append to the file, a rewind appending a branch whose first line continues (`parentUuid`) from a line before the file's end; a truncation or rewrite was not observed but stays possible                                                                                                                                                                                                                                                                                                                                                                                                       | Re-planned after S3 on Claude Code 2.1.296: each earlier recording is a byte prefix of the later                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | S3          | REC-07                   |
-| ASM-05 | Claude Code may delete transcripts after `cleanupPeriodDays` (default 30), at a harness start whose conditions ParleyInn cannot see: S3 saw an old subagent transcript deleted and old harness session transcripts kept                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | Partly verified on Claude Code 2.1.296 by S3                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | S3          | REC-08                   |
-| ASM-06 | Hooks fired for a compaction (`PreCompact`, `SessionStart` with `source` = `compact`, `PostCompact`) carry the main agent's harness session's `session_id` and `transcript_path` and no subagent fields, whether the main agent, a foreground subagent or a background subagent compacts; the `additionalContext` that `SessionStart` returns lands in the compacting agent's transcript, where the model reads it; and no transcript holds the compaction's boundary until those hooks return                                                                                                                                                                                                               | Verified on Claude Code 2.1.296 by S1's and S13's recorded hook inputs, transcripts and hook-time snapshots; anthropics/claude-code#91910                                                                                                                                                                                                                                                                                                                                                                                                                                 | S1, S13     | REC-04, INJ-01, INJ-05   |
-| ASM-07 | Claude Code plugins can bundle hooks and MCP servers, and the Agent SDK can load plugins                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Verified on Claude Code 2.1.296 and Agent SDK 0.3.296 by S4's recorded installs: a plugin's hooks and MCP server load on a workstation through `claude plugin install`, with a `~/.claude/settings.json` that alone declares and enables it, as a runner image bakes it, and in an Agent SDK worker through the `plugins` option; its tools are named `mcp__plugin_<plugin>_<server>__<tool>`                                                                                                                                                                             | S4          | ADM-01                   |
-| ASM-08 | Self-hosted runners seed the runner host's `~/.claude/` into each harness session; each runner is locked to one OS user                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | Claude Code self-hosted environments docs. Re-planned after S4, which had no self-hosted runner: it ran in Anthropic's cloud environment, as root; to be recorded on a self-hosted runner before ADM-01 ships there                                                                                                                                                                                                                                                                                                                                                       | S4          | ADM-01, SEC-01           |
-| ASM-09 | A `PreCompact` hook exiting with code 2 blocks compaction                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | Verified on Claude Code 2.1.296 by S6's recordings: a handler exiting 2 blocked a manual compaction and every automatic one, the harness's last attempt at the full context window included, and no `compact_boundary` line, `PostCompact` or `SessionStart` with `source` = `compact` followed; a manual compaction's command output, which the model reads, carries the handler's command and stderr; at the full context window the harness refuses every prompt (OQ-01). One hooks guide said yes; the Morph plugin README said native compaction cannot be prevented | S6          | OQ-01                    |
-| ASM-10 | The harness timeout is configurable per hook, `SessionEnd` included; a `SessionEnd` hook configured without one gets ≈1.5 s; in print mode a `Stop` hook that reaches its harness timeout keeps every `SessionEnd` hook from starting                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | Re-planned after S1 on Claude Code 2.1.296: measured in print and interactive mode                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | S1          | NFR-02, §9.1             |
-| ASM-11 | Context the harness adds for the model (CLAUDE.md files, MCP server instructions, skill listings, reminders) is written as `attachment` lines carrying `attachment.type` and a `renderedRole` that can be `user`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Verified on Claude Code 2.1.296 by S3: CLAUDE.md as `instructions`, MCP server instructions as `mcp_instructions_delta`, skills as `skill_listing`                                                                                                                                                                                                                                                                                                                                                                                                                        | S3          | PRV-01..03, PRV-08       |
-| ASM-12 | Each assistant line carries one content block; one API message spans several lines that share `message.id` and repeat its `usage`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Verified on Claude Code 2.1.296 by S3                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | S3          | REC-03, LMK-02, §8.4     |
-| ASM-13 | A tool-result line repeats the output in a top-level `toolUseResult` field and names its call's line in `sourceToolAssistantUUID`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Verified on Claude Code 2.1.296 by S3; `toolUseResult`'s shape differs per tool                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | S3          | PRV-08, SEC-08           |
-| ASM-14 | Some transcript line types carry no `uuid` or no `timestamp`: `queue-operation` lines carry no `uuid`, and `last-prompt`, `ai-title`, `atis-latch`, `cost-state`, `mode`, `permission-mode` and `file-history-snapshot` lines neither                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | Verified on Claude Code 2.1.296 by S3                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | S3          | REC-03, REC-12           |
-| ASM-15 | Transcripts keep a thinking block's signature but not its text                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | Verified on Claude Code 2.1.296 by S3                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | S3          | REC-01                   |
-| ASM-16 | The name of a transcript directory under `~/.claude/projects/` replaces at least each `/`, `\`, `:`, `_` and `.` of the working directory with `-`, so distinct working directories can share one transcript directory                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | Verified on Claude Code 2.1.296 by S3: `/w/my_app`, `/w/my.app` and `/w/my-app` share `-w-my-app`                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | S3          | REC-04                   |
-| ASM-17 | Claude Code appends each transcript line within 1 s of the event while an agent runs                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | none yet                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | S9          | VIEW-02                  |
-| ASM-18 | While a `PermissionRequest` hook runs, Claude Code's own prompt stays answerable, and the hook may return no decision                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | none yet; the fleet-developer review suspects not                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | S9          | OWN-06, OWN-15           |
-| ASM-19 | The Agent SDK, ACP and the Codex app-server expose input interfaces for steer, interrupt and stop                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | none yet                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | S10         | OWN-03, OWN-15           |
-| ASM-20 | The root commit, HEAD, refs and trees of a clone are obtainable inside the core (no socket, no program start)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | none yet                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | S11         | LANE-02, LANE-06, REC-20 |
-| ASM-21 | A harness session's one MCP server serves its main run and its subagents' runs, and can keep all their run-seat keys outside the model's context                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Re-planned after S4 on Claude Code 2.1.296: one server process served the main run and a subagent, and the keys it minted reached no transcript, hook input or tool result; but a key handed over at launch in the harness's environment reached the Bash tool, and the model printed it (OQ-55); a tool call names no run, only its tool-use id (`_meta` `claudecode/toolUseId`), and the transcript line carrying it names the run but reached the transcript up to 0.5 s after the call (OQ-54)                                                                        | S4          | SEC-10, LANE-23, LANE-24 |
-| ASM-22 | The harness puts its attended mark (Claude Code: `CLAUDE_CODE_SESSION_ATTENDED` set to `1`) in each hook handler's environment only when the harness session runs in the harness's own terminal interface, not in print mode or the Agent SDK, whatever the environment that starts it sets; its MCP server gets no mark of its own and inherits what that environment sets                                                                                                                                                                                                                                                                                                                                  | Verified on Claude Code 2.1.296 by S4's recordings: `1` in the interactive terminal, `0` in print mode and in the Agent SDK, and `0` in print mode started with `1` set, where the MCP server inherited the `1`                                                                                                                                                                                                                                                                                                                                                           | S4          | PRV-04                   |
+### ASM-01
+
+- Evidence so far: Verified on Claude Code 2.1.296 by S1's recorded hook inputs;
+  `fork` was undocumented
+- Verified in: S1
+- Affects: §9.1, REC-02
+
+Hook inputs include `session_id`, `transcript_path`, `cwd`, `hook_event_name`;
+`SessionStart` adds `source` ∈ {`startup`, `resume`, `clear`, `compact`,
+`fork`}; `PreCompact` adds `trigger` and `custom_instructions`; `PostCompact`
+adds `trigger` and `compact_summary`; `UserPromptSubmit` adds `prompt`; a
+`SessionStart` with `source` = `resume` (a harness resume, by `--resume` or
+`--continue`) carries the resumed harness session's `session_id`, and one with
+`fork` or `clear` a new one
+
+### ASM-02
+
+- Evidence so far: Re-planned after S1 on Claude Code 2.1.296: recorded
+  transcripts and nonce probes
+- Verified in: S1
+- Affects: INJ-*, §9.1
+
+`SessionStart` (every `source`), `UserPromptSubmit` and `PostToolUse` hooks can
+return `additionalContext`, and the model reads it; `PreCompact` and
+`PostCompact` cannot, as the harness rejects their `hookSpecificOutput`, but on
+a manual compaction it repeats each `PreCompact` and `PostCompact` hook's
+output, accepted or rejected, in command output the model reads, and appends
+`PreCompact`'s plain output to the compaction's instructions; with a nonzero
+exit status their stderr reaches the model the same way, while with exit status
+0 no hook's stderr does; on a harness resume it drops a `SessionStart`
+`additionalContext` equal to one in the transcript since its last compaction
+
+### ASM-03
+
+- Evidence so far: Verified on Claude Code 2.1.296 by S3's recorded tree
+- Verified in: S3
+- Affects: REC-01..06
+
+Transcripts are JSONL files under `~/.claude/projects/<transcript-dir>/`, one
+per harness session, with subagent transcripts under `<session_id>/subagents/`,
+each with a `.meta.json` beside it naming its agent type; a fork or `/clear`
+starts a new transcript, a fork repeating the earlier lines with their `uuid`s
+
+### ASM-04
+
+- Evidence so far: Re-planned after S3 on Claude Code 2.1.296: each earlier
+  recording is a byte prefix of the later
+- Verified in: S3
+- Affects: REC-07
+
+Transcripts are append-only in every flow recorded: a resume, a compaction, a
+rewind and a partial compaction append to the file, a rewind appending a branch
+whose first line continues (`parentUuid`) from a line before the file's end; a
+truncation or rewrite was not observed but stays possible
+
+### ASM-05
+
+- Evidence so far: Partly verified on Claude Code 2.1.296 by S3
+- Verified in: S3
+- Affects: REC-08
+
+Claude Code may delete transcripts after `cleanupPeriodDays` (default 30), at a
+harness start whose conditions ParleyInn cannot see: S3 saw an old subagent
+transcript deleted and old harness session transcripts kept
+
+### ASM-06
+
+- Evidence so far: Verified on Claude Code 2.1.296 by S1's and S13's recorded
+  hook inputs, transcripts and hook-time snapshots; anthropics/claude-code#91910
+- Verified in: S1, S13
+- Affects: REC-04, INJ-01, INJ-05
+
+Hooks fired for a compaction (`PreCompact`, `SessionStart` with `source` =
+`compact`, `PostCompact`) carry the main agent's harness session's `session_id`
+and `transcript_path` and no subagent fields, whether the main agent, a
+foreground subagent or a background subagent compacts; the `additionalContext`
+that `SessionStart` returns lands in the compacting agent's transcript, where
+the model reads it; and no transcript holds the compaction's boundary until
+those hooks return
+
+### ASM-07
+
+- Evidence so far: Verified on Claude Code 2.1.296 and Agent SDK 0.3.296 by S4's
+  recorded installs: a plugin's hooks and MCP server load on a workstation
+  through `claude plugin install`, with a `~/.claude/settings.json` that alone
+  declares and enables it, as a runner image bakes it, and in an Agent SDK
+  worker through the `plugins` option; its tools are named
+  `mcp__plugin_<plugin>_<server>__<tool>`
+- Verified in: S4
+- Affects: ADM-01
+
+Claude Code plugins can bundle hooks and MCP servers, and the Agent SDK can load
+plugins
+
+### ASM-08
+
+- Evidence so far: Claude Code self-hosted environments docs. Re-planned after
+  S4, which had no self-hosted runner: it ran in Anthropic's cloud environment,
+  as root; to be recorded on a self-hosted runner before ADM-01 ships there
+- Verified in: S4
+- Affects: ADM-01, SEC-01
+
+Self-hosted runners seed the runner host's `~/.claude/` into each harness
+session; each runner is locked to one OS user
+
+### ASM-09
+
+- Evidence so far: Verified on Claude Code 2.1.296 by S6's recordings: a handler
+  exiting 2 blocked a manual compaction and every automatic one, the harness's
+  last attempt at the full context window included, and no `compact_boundary`
+  line, `PostCompact` or `SessionStart` with `source` = `compact` followed; a
+  manual compaction's command output, which the model reads, carries the
+  handler's command and stderr; at the full context window the harness refuses
+  every prompt (OQ-01). One hooks guide said yes; the Morph plugin README said
+  native compaction cannot be prevented
+- Verified in: S6
+- Affects: OQ-01
+
+A `PreCompact` hook exiting with code 2 blocks compaction
+
+### ASM-10
+
+- Evidence so far: Re-planned after S1 on Claude Code 2.1.296: measured in print
+  and interactive mode
+- Verified in: S1
+- Affects: NFR-02, §9.1
+
+The harness timeout is configurable per hook, `SessionEnd` included; a
+`SessionEnd` hook configured without one gets ≈1.5 s; in print mode a `Stop`
+hook that reaches its harness timeout keeps every `SessionEnd` hook from
+starting
+
+### ASM-11
+
+- Evidence so far: Verified on Claude Code 2.1.296 by S3: CLAUDE.md as
+  `instructions`, MCP server instructions as `mcp_instructions_delta`, skills as
+  `skill_listing`
+- Verified in: S3
+- Affects: PRV-01..03, PRV-08
+
+Context the harness adds for the model (CLAUDE.md files, MCP server
+instructions, skill listings, reminders) is written as `attachment` lines
+carrying `attachment.type` and a `renderedRole` that can be `user`
+
+### ASM-12
+
+- Evidence so far: Verified on Claude Code 2.1.296 by S3
+- Verified in: S3
+- Affects: REC-03, LMK-02, §8.4
+
+Each assistant line carries one content block; one API message spans several
+lines that share `message.id` and repeat its `usage`
+
+### ASM-13
+
+- Evidence so far: Verified on Claude Code 2.1.296 by S3; `toolUseResult`'s
+  shape differs per tool
+- Verified in: S3
+- Affects: PRV-08, SEC-08
+
+A tool-result line repeats the output in a top-level `toolUseResult` field and
+names its call's line in `sourceToolAssistantUUID`
+
+### ASM-14
+
+- Evidence so far: Verified on Claude Code 2.1.296 by S3
+- Verified in: S3
+- Affects: REC-03, REC-12
+
+Some transcript line types carry no `uuid` or no `timestamp`: `queue-operation`
+lines carry no `uuid`, and `last-prompt`, `ai-title`, `atis-latch`,
+`cost-state`, `mode`, `permission-mode` and `file-history-snapshot` lines
+neither
+
+### ASM-15
+
+- Evidence so far: Verified on Claude Code 2.1.296 by S3
+- Verified in: S3
+- Affects: REC-01
+
+Transcripts keep a thinking block's signature but not its text
+
+### ASM-16
+
+- Evidence so far: Verified on Claude Code 2.1.296 by S3: `/w/my_app`,
+  `/w/my.app` and `/w/my-app` share `-w-my-app`
+- Verified in: S3
+- Affects: REC-04
+
+The name of a transcript directory under `~/.claude/projects/` replaces at least
+each `/`, `\`, `:`, `_` and `.` of the working directory with `-`, so distinct
+working directories can share one transcript directory
+
+### ASM-17
+
+- Evidence so far: none yet
+- Verified in: S9
+- Affects: VIEW-02
+
+Claude Code appends each transcript line within 1 s of the event while an agent
+runs
+
+### ASM-18
+
+- Evidence so far: none yet; the fleet-developer review suspects not
+- Verified in: S9
+- Affects: OWN-06, OWN-15
+
+While a `PermissionRequest` hook runs, Claude Code's own prompt stays
+answerable, and the hook may return no decision
+
+### ASM-19
+
+- Evidence so far: none yet
+- Verified in: S10
+- Affects: OWN-03, OWN-15
+
+The Agent SDK, ACP and the Codex app-server expose input interfaces for steer,
+interrupt and stop
+
+### ASM-20
+
+- Evidence so far: none yet
+- Verified in: S11
+- Affects: LANE-02, LANE-06, REC-20
+
+The root commit, HEAD, refs and trees of a clone are obtainable inside the core
+(no socket, no program start)
+
+### ASM-21
+
+- Evidence so far: Re-planned after S4 on Claude Code 2.1.296: one server
+  process served the main run and a subagent, and the keys it minted reached no
+  transcript, hook input or tool result; but a key handed over at launch in the
+  harness's environment reached the Bash tool, and the model printed it (OQ-55);
+  a tool call names no run, only its tool-use id (`_meta`
+  `claudecode/toolUseId`), and the transcript line carrying it names the run but
+  reached the transcript up to 0.5 s after the call (OQ-54)
+- Verified in: S4
+- Affects: SEC-10, LANE-23, LANE-24
+
+A harness session's one MCP server serves its main run and its subagents' runs,
+and can keep all their run-seat keys outside the model's context
+
+### ASM-22
+
+- Evidence so far: Verified on Claude Code 2.1.296 by S4's recordings: `1` in
+  the interactive terminal, `0` in print mode and in the Agent SDK, and `0` in
+  print mode started with `1` set, where the MCP server inherited the `1`
+- Verified in: S4
+- Affects: PRV-04
+
+The harness puts its attended mark (Claude Code: `CLAUDE_CODE_SESSION_ATTENDED`
+set to `1`) in each hook handler's environment only when the harness session
+runs in the harness's own terminal interface, not in print mode or the Agent
+SDK, whatever the environment that starts it sets; its MCP server gets no mark
+of its own and inherits what that environment sets
 
 ## 2.4 Constraints
 
