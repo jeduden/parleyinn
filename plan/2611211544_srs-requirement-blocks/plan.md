@@ -175,6 +175,7 @@ The review's agents MUST have no credential that can approve or write.
 | 11    | sonnet | Appendix B is a list, word for word; its gate passes                                                                                                                 |
 | 12    | sonnet | The tools are a list, word for word; RCL-01 passes                                                                                                                   |
 | 14    | sonnet | ENG-28 and ENG-32 are blocks, word for word; the gates pass                                                                                                          |
+| 15    | sonnet | A requirement table fails the parse gate; the tests pass                                                                                                             |
 
 ## Phases
 
@@ -225,6 +226,7 @@ footer: |
 |     | ↳      | The 30 MCP tools of §9.2 are each a list item, word for word as the table held them, their priority, parameters, returns and limits fields under the tool's name, wrapped at 80 columns. The section falls from 46,675 bytes in 245 lines to 23,901 in 393, where each row was padded to 969 characters. The recall scenario reads the list. No requirement changes, and no scenario comes off @pending.                                                                                                                                  |
 | 14  | ✅     | [The review section written as blocks](phase-14.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 |     | ↳      | ENG-28 and ENG-32, the review section's two requirements, are each written as a block, and neither changes: main's review bundle shows each with main's text alone. ENG-28 holds 193 lines, the length the srs kind lists it at. No requirement table is left in the SRS. No scenario comes off @pending.                                                                                                                                                                                                                                 |
+| 15  | 🔳     | [The parser refuses a requirement table](phase-15.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 <?/catalog?>
 
 ## Acceptance Criteria
