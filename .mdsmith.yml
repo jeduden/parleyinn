@@ -79,6 +79,8 @@ kinds:
     rules:
       table-readability: false
       paragraph-readability: false
+      # Only a word may run past 80 columns (§9.5): ruled 22 November 2026.
+      line-length: { stern: true }
       # A requirement written under its own heading wraps at 80
       # columns, one sentence a line (plan 2611211544), so a section
       # may hold 700 lines: the stakeholder's ruling of 21 November

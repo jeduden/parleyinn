@@ -533,6 +533,23 @@ pub(super) fn block_length_cases() -> Vec<Case> {
     )]
 }
 
+/// The drift mdsmith's line length for the srs kind catches, stern as
+/// it is: a sentence run on past 80 columns, with a space past them to
+/// wrap at. A line may pass them only with no space past them.
+pub(super) fn line_length_cases() -> Vec<Case> {
+    vec![case(
+        "a sentence of the SRS run on past 80 columns",
+        "mdsmith check",
+        Injection::replace(
+            "docs/srs/09a-command-line-interface.md",
+            "on a room its\nprincipal has no member seat in",
+            "on a room its principal has no member seat in",
+        ),
+        mdsmith(),
+        "line too long",
+    )]
+}
+
 /// The drifts mdsmith's schema for the srs kind catches in a
 /// requirement written as a block before the heading of §10.4: each a
 /// shape the srs crate reads, broken.
