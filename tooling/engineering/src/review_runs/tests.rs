@@ -472,6 +472,56 @@ fn a_bundle_that_names_no_class_row_or_finding_is_named() {
     );
 }
 
+/// A requirement the context check's file names, with `text`.
+fn eng_28(text: &str) -> srs::Requirement {
+    srs::Requirement {
+        id: "ENG-28".into(),
+        text: text.into(),
+        path: "/r/docs/srs/10a.md".into(),
+        line: 13,
+        ..srs::Requirement::default()
+    }
+}
+
+/// A context that quotes [`eng_28`] of `One rule. Another; and more.`
+/// whole, at its place.
+const QUOTED: &str = "## Requirements your files touch\n\n`ENG-28` (`docs/srs/10a.md:13`), \
+                      Pri P0, Ver T, Traces none:\n\n> One rule.\n> Another;\n> and more.\n";
+
+#[test]
+fn a_context_quoting_the_requirement_its_file_names_whole_at_its_place_has_no_problem() {
+    let row = eng_28("One rule. Another; and more.");
+
+    assert!(row_lacks("lang-markdown", &row, QUOTED).is_empty());
+}
+
+#[test]
+fn a_context_quoting_the_requirement_in_part_or_off_its_place_is_named() {
+    let row = eng_28("One rule. Another; and more.");
+
+    assert_eq!(
+        row_lacks("lang-markdown", &row, &QUOTED.replace("> and more.\n", "")),
+        ["the context for lang-markdown does not quote ENG-28 whole"]
+    );
+    assert_eq!(
+        row_lacks("lang-markdown", &row, &QUOTED.replace(":13`", "`")),
+        ["the context for lang-markdown does not name ENG-28 at docs/srs/10a.md:13"]
+    );
+}
+
+#[test]
+fn a_quote_the_context_check_cannot_read_is_named() {
+    let work = TempDir::new().unwrap();
+
+    let problems = quoted_in(work.path(), Ok(eng_28("x")));
+
+    assert!(problems[0].starts_with("read "), "{problems:?}");
+    assert_eq!(
+        quoted_in(work.path(), Err("no requirement ENG-28 in the SRS".into())),
+        ["no requirement ENG-28 in the SRS"]
+    );
+}
+
 #[test]
 fn a_bundle_context_on_the_checkout_has_no_problem() {
     let work = TempDir::new().unwrap();

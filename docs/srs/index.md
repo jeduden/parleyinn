@@ -515,7 +515,7 @@ row: "- [{title}]({filename}) — {summary}"
 - [13. Open questions and risks](13-open-questions-and-risks.md) — Open questions OQ-01..58 with their resolution path, and the risk register with mitigations.
 - [14. References](14-references.md) — The papers, issues, and standards the specification cites.
 - [Appendix A — Concern traceability](appendix-a-concern-traceability.md) — Every concern raised during research and review, mapped to the requirements that answer it.
-- [Appendix B — Invariant coverage](appendix-b-invariant-coverage.md) — Which requirements serve each invariant, generated from the Traces column of §5–§6, plus the requirement count by priority. A gate test keeps both in step with the tables.
+- [Appendix B — Invariant coverage](appendix-b-invariant-coverage.md) — Which requirements serve each invariant, generated from the Traces of the requirements of §5–§6, plus the requirement count by priority. A gate test keeps both in step with the requirements.
 - [Appendix C — Persona coverage](appendix-c-persona-coverage.md) — Which personas (§2.5) each requirement of §5–§7 and §10 serves. A gate test keeps every requirement covered and every persona served, and another keeps §2.5 in step with the persona agents.
 - [1.3 Invariants](invariants.md) — The single source of ParleyInn's ten invariants, I1 to I10, which every requirement serves; other files include it through mdsmith.
 <?/catalog?>

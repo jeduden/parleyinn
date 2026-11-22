@@ -5,7 +5,8 @@
 //! writes the review outcome from what they answered, telling each
 //! specialist to read only its own diff and the context the review bundle
 //! wrote for it, never the whole bundle; that context names the ENG-29
-//! record a guarded change lands with. The check runs
+//! record a guarded change lands with and quotes whole each requirement
+//! its files touch. The check runs
 //! `review-run` on a work directory holding the checkout's definitions
 //! of the dispatched agents, with a stand-in for the `claude` command
 //! line that records when each agent's run starts and ends, answers as
@@ -650,16 +651,65 @@ const LIFTS_A_BAN: &str = "allows clippy::disallowed_methods";
 /// What is wrong with the context specialist [`CONTEXT`] names that the
 /// review bundle wrote, run on `checkout` as both trees with a change
 /// to the file [`CONTEXT`] names, into `out`: it lacks the review class,
-/// the touched ids, a dispatch row that names the specialist or a
-/// deterministic finding on its files.
+/// the touched ids, a dispatch row that names the specialist, a
+/// deterministic finding on its files or the requirement its file
+/// names, quoted whole at its place.
 #[must_use]
 pub fn context_problems(checkout: &Checkout, out: &Path) -> Vec<String> {
     let (_, path, id) = CONTEXT;
     let diff = format!("{}+{id} {LIFTS_A_BAN}\n", one_line_diff(path));
     match bundle(checkout, out, &diff, "[]") {
-        Ok(printed) => context_in(out, &printed),
+        Ok(printed) => {
+            let mut problems = context_in(out, &printed);
+            problems.extend(quoted_in(out, checkout.requirement(id)));
+            problems
+        }
         Err(problems) => problems,
     }
+}
+
+/// What is wrong with how the context [`CONTEXT`] names, among the files
+/// the review bundle wrote into `out`, quotes `row`, the requirement its
+/// file names; a context it did not write, or a row that did not read,
+/// is named.
+#[must_use]
+pub fn quoted_in(out: &Path, row: Result<srs::Requirement, String>) -> Vec<String> {
+    let name = CONTEXT.0;
+    let file = out.join(format!("{CONTEXTS}/{name}.md"));
+    match (row, fs::read_to_string(&file)) {
+        (Ok(row), Ok(context)) => row_lacks(name, &row, &context),
+        (Err(e), _) => vec![e],
+        (Ok(_), Err(e)) => vec![format!("read {}: {e}", file.display())],
+    }
+}
+
+/// What `context`, the context for `name`, lacks of `row`, the
+/// requirement its file names: its place in the specification, or its
+/// text whole among the lines the context quotes, word for word.
+#[must_use]
+pub fn row_lacks(name: &str, row: &srs::Requirement, context: &str) -> Vec<String> {
+    let words = |text: &str| text.split_whitespace().collect::<Vec<_>>().join(" ");
+    let file = row.path.file_name().unwrap_or_default().to_string_lossy();
+    let place = format!("docs/srs/{file}:{}", row.line);
+    let quoted: Vec<&str> = context
+        .lines()
+        .filter_map(|l| l.strip_prefix("> "))
+        .collect();
+    let mut problems = Vec::new();
+    if !context.contains(&format!("`{}` (`{place}`", row.id)) {
+        problems.push(format!(
+            "the context for {name} does not name {} at {place}",
+            row.id
+        ));
+    }
+    if !words(&quoted.join(" ")).contains(&words(&row.text)) {
+        problems.push(format!(
+            "the context for {name} does not quote {} whole",
+            row.id
+        ));
+    }
+
+    problems
 }
 
 /// The head of a diff of `path` that adds one line, which follows.

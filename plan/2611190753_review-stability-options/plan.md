@@ -96,6 +96,9 @@ its evidence asks for today.
 10. A place a generalist spells in the pull request's tree is read as
     the same place, for its weighing and its findings (phase 10,
     ENG-28).
+11. A specialist's context quotes whole the requirements its files
+    touch, and `lang-gherkin` searches the specification for none
+    (phase 11, ENG-28).
 12. A read the file system resolves to a specialist's diff covers it,
     whatever path it took (phase 12, ENG-28).
 13. A specialist whose recorded runs reached its turn budget gets one
@@ -115,6 +118,7 @@ its evidence asks for today.
 | 8     | opus  | The generalists' cases pass on their models, no line before the final answer                                        |
 | 9     | opus  | The finding on a generalist that ended on an error quotes it                                                        |
 | 10    | opus  | The ENG-28 weighing check approves a weighing spelled in the pull request's tree; two drift cases fail              |
+| 11    | opus  | The ENG-28 context check finds ENG-28 quoted whole; two drift cases fail; lang-gherkin's cases pass in fewer turns  |
 | 12    | opus  | A read that climbs out of the pull request's tree to its diff, or a kept part's read where it ran, covers it        |
 | 13    | opus  | The five specialists' cases pass on their models with 30 turns, above the most any recorded run took                |
 
@@ -161,6 +165,8 @@ footer: |
 |     | ↳      | ENG-28 keeps its row: the review now keeps the harness's text apart from an agent's answer when a run ended on an error, a usage limit or a call the model's API refused. The finding on a generalist so ended quotes the error, and the summary names an error among the ways a run ends without a successful result, where it named only a turn budget, a deadline or a cost cap. Two drift cases land with it.                                                                                                                                               |
 | 10  | ✅     | [A place spelled in the pull request's tree is the same place](phase-10.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 |     | ↳      | ENG-28 gains one sentence: the review reads a place a generalist spelled in the pull request's tree, `pr-head/<path>`, as the file at that path. The review of pull request 154 had blocked on a weighing that named all four of its places that way, a spelling the evaluation's grader already took. The findings such lines keep are posted and tracked at the repository's path. A fifth run of the ENG-28 weighing check, named in its scenario step, and two drift cases land with it; no instruction changes.                                            |
+| 11  | ✅     | [A specialist reads the requirements its files touch in its context](phase-11.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+|     | ↳      | ENG-28 gains a clause: each specialist's review context quotes whole each touched requirement its files change or name, one sentence or clause per line. A requirement is one table line a search shows only in part, and `lang-gherkin` had spent its twenty turns searching ENG-28's 13,856 characters. It now weighs each changed step against main's step, then against its row as its context quotes it, and leaves to CI the tags and bindings CI proves. The ENG-28 context check, two drift cases and a new `lang-gherkin` case land with it.           |
 | 12  | ✅     | [A read the file system resolves to the diff covers it](phase-12.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 |     | ↳      | ENG-28's review now counts every read of a specialist's diff, by whatever path the file system resolves to it. The local review of §2, §5, §5a and §7 written as blocks had named two specialists' parts partial that read their whole diffs: one by a path that climbed out of the pull request's tree, two kept on a resume and read under the first run's work directory. A climb through a link the pull request plants still covers nothing. No requirement or instruction changes.                                                                        |
 | 13  | ✅     | [A specialist's turn budget sits above the turns its runs take](phase-13.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
@@ -189,6 +195,8 @@ footer: |
       as an agent that answered nothing
 - [x] A weighing that names its places in the pull request's tree is
       read as whole
+- [x] A specialist's context quotes whole the requirements its files
+      touch, and `lang-gherkin`'s cases pass without a search
 - [x] A specialist that read its whole diff is never named partial for
       the path it read it by
 - [x] Every specialist's turn budget sits above the most turns a

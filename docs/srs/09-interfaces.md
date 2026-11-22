@@ -61,38 +61,186 @@ recorded apart from provenance (domain model:
 [Provenance](../domain-model/record.md),
 [Provenance class family](../domain-model/trust-and-flow.md)).
 
-| Tool                    | Pri | Parameters                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | Returns                                                                                                                                                                                                                                                                                                                                                       | Limits                                           |
-| ----------------------- | --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
-| `event_search`          | P0  | `query` (string, literal terms), `any_of` / `all_of` / `phrase` (optional structured operators), `scope` (`run` \| `room` \| `rooms`; default `run`), `room`, `run` (a run id within the scope), `provenance[]`, `kind[]`, `trust`, `since`, `until`, `k`                                                                                                                                                                                                                                                                                          | Envelope of hits: `address`, run, provenance, trust, flags, kind, preview, score                                                                                                                                                                                                                                                                              | k ≤ 50; 2 s deadline                             |
-| `event_expand`          | P0  | `range` (an address range in any shown form, or two addresses, RCL-08), `scope` (default `run`), `room`, `cursor`                                                                                                                                                                                                                                                                                                                                                                                                                                  | Envelope of full events in range, payloads resolved                                                                                                                                                                                                                                                                                                           | 8,000 model tokens per call; continuation cursor |
-| `event_get`             | P0  | `address` (RCL-08), `scope` (default `run`), `room`, `cursor`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | Envelope with one full event                                                                                                                                                                                                                                                                                                                                  | 8,000 model tokens per call                      |
-| `landmark_list`         | P0  | `scope` (default `run`), `room`, `tier`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Landmark blocks with address ranges, in the envelope                                                                                                                                                                                                                                                                                                          | 4,000 model tokens                               |
-| `pin_list`              | P0  | `scope` (default `run`), `room` (optional, P1)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Without `room`: the qualifying pins (PIN-10) that restore to the calling agent and its pending pin candidates (candidates marked), in the envelope. With `room`: the room's pins, intent first, each with its pin type and pin versions, each version with its author's seat id and seat kind, stamps and key fingerprint, in the envelope (LANE-26, LANE-27) | —                                                |
-| `stat_list`             | P0  | `scope` (default `run`), `room`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | Event counts, runs, compactions and recall counts within the caller's recall scope, in the envelope marked structural; a recall tool, it records a recall event (RCL-07)                                                                                                                                                                                      | —                                                |
-| `mcp_server_get`        | P0  | —                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | `session_binding` (`held` or `not_held`), `search_index` (`readable` or `unreadable`), `searches_timed_out` and `version`, as closed words and counts and no recalled content; no envelope                                                                                                                                                                    | —                                                |
-| `pin_candidate_propose` | P1  | `text`, `type`, `reason`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Pin-candidate id; states that only its principal's confirmation makes it a pin, the owner's alone for an intent or a criterion (PIN-05, LANE-20)                                                                                                                                                                                                              | 1,000 characters                                 |
-| `kernel_exec`           | P1  | `code`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Envelope with the last row-returning statement's rows, error, kernel variables changed                                                                                                                                                                                                                                                                        | CMP-05, CMP-06                                   |
-| `kernel_variable_list`  | P1  | —                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | Names, types and sizes of the run's kernel variables                                                                                                                                                                                                                                                                                                          | —                                                |
-| `kernel_reset`          | P1  | —                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | Confirmation                                                                                                                                                                                                                                                                                                                                                  | —                                                |
-| `room_get`              | P1  | `room`, `id` (optional); without `id`, returns the closed field set of VIEW-15 in the envelope marked structural; with `id`, returns one act, post, pin version, question or reason by id, in the envelope (VIEW-15, LANE-25, LANE-30); a recall tool, it records a recall event (RCL-07)                                                                                                                                                                                                                                                          |                                                                                                                                                                                                                                                                                                                                                               |                                                  |
-| `room_post`             | P1  | `text`, `room` (optional target room, LANE-29); writes a `post`, always untrusted (PRV-01)                                                                                                                                                                                                                                                                                                                                                                                                                                                         |                                                                                                                                                                                                                                                                                                                                                               |                                                  |
-| `delegation_start`      | P1  | `target`, `task`; delegates under a delegation grant in force (OWN-23), refused without one                                                                                                                                                                                                                                                                                                                                                                                                                                                        |                                                                                                                                                                                                                                                                                                                                                               |                                                  |
-| `delegation_get`        | P1  | `delegation`; returns the delegate report in the envelope (OWN-25)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |                                                                                                                                                                                                                                                                                                                                                               |                                                  |
-| `room_link`             | P1  | `room` and one qualified link: `branch` records a branch link (LANE-01); `range` with a `post` or `pin` records a range link to a marked range; or `result` (the address of one of the agent's own results) with `criteria` (criterion ids, each with the intent version it belongs to) records a criterion link from the result to each criterion of its own room's intent, never across rooms, which leaves the result's evidence class as it was: a delegated task for another room traces through a delegation link (LANE-16, LANE-21, OWN-24) |                                                                                                                                                                                                                                                                                                                                                               |                                                  |
-| `room_join_request`     | P1  | `room`; records a join request, a room act of the run's personal-room seat naming the room, checked against the room's admission and needing the run's principal's acceptance unless that principal asked for the join (LANE-23, LANE-24); until the rest of LANE-23 ships (M7, §12.2), one made without that ask is refused, audited and counted; returns the seat id once it takes effect                                                                                                                                                        |                                                                                                                                                                                                                                                                                                                                                               |                                                  |
-| `room_leave`            | P1  | `room`; records the seat's leave (LANE-23)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |                                                                                                                                                                                                                                                                                                                                                               |                                                  |
-| `room_pin`              | P1  | `room`, `text`, `type`; pins from the run seat, a room act on a run-seat pin, an active pin with provenance `assistant` that restores to no agent until a principal stamps a pin version of it (LANE-26, LANE-32); no MCP tool adds a pin that restores, and no room act changes any restore block; a `type` of `intent` or `verdict` is refused, since only a principal act pins one (LANE-26, OWN-27)                                                                                                                                            |                                                                                                                                                                                                                                                                                                                                                               |                                                  |
-| `room_edit`             | P1  | `room`, `pin`, `text`; adds an unstamped pin version to one of the run seat's own pins, a room act; the new version restores to no agent until stamped (LANE-26, LANE-32); a stamped earlier version keeps restoring to its stamper's agents, and the stamper gets a Needs you item, audited; it edits no other pin                                                                                                                                                                                                                                |                                                                                                                                                                                                                                                                                                                                                               |                                                  |
-| `room_unpin`            | P1  | `room`, `pin`; unpins one of the run seat's own pins, a room act that takes the pin off the room's pin list (LANE-26); every stamped version keeps restoring to its stamper's agents until the stamper unstamps it, and the stamper gets a Needs you item, audited (LANE-32); it unpins no other pin, since only a pin's author or its author's principal unpins one                                                                                                                                                                               |                                                                                                                                                                                                                                                                                                                                                               |                                                  |
-| `room_create`           | P1  | `title`; creates a room owned by the agent's principal and returns its id; the calling run's new run seat signs the create room act as its writer's first act, which is that seat's add: the seat is a contributor (LANE-16) and a member until a kick revokes it, a bar covers it or it leaves, like any add, and the run's events go there while it works on a branch the room names and that seat is a member with work (LANE-01, LANE-23)                                                                                                      |                                                                                                                                                                                                                                                                                                                                                               |                                                  |
-| `room_present`          | P1  | `room`, `presentation`, `branch`; puts the presentation in the outcome window, with the seat and branch (LANE-16, VIEW-22)                                                                                                                                                                                                                                                                                                                                                                                                                         |                                                                                                                                                                                                                                                                                                                                                               |                                                  |
-| `room_pick`             | P1  | `room`, `presentation`; chooses which presentation the outcome window shows, moderators only; concurrent picks resolve by pick order (LANE-16, LANE-31, VIEW-22)                                                                                                                                                                                                                                                                                                                                                                                   |                                                                                                                                                                                                                                                                                                                                                               |                                                  |
-| `room_kick`             | P1  | `room`, `seat`, `reason`; moderators only, an appointed moderator within SEC-32 (LANE-16, LANE-25)                                                                                                                                                                                                                                                                                                                                                                                                                                                 |                                                                                                                                                                                                                                                                                                                                                               |                                                  |
-| `room_bar`              | P1  | `room`, `key` (a principal key), `reason`, `expiry` (optional); moderators only, an appointed moderator within SEC-32 (LANE-16, LANE-25)                                                                                                                                                                                                                                                                                                                                                                                                           |                                                                                                                                                                                                                                                                                                                                                               |                                                  |
-| `room_mute`             | P1  | `room`, `seat` (optional; the whole room when omitted), `reason`, `expiry` (optional); moderators only, an appointed moderator within SEC-32, which never mutes the whole room (LANE-16, LANE-25)                                                                                                                                                                                                                                                                                                                                                  |                                                                                                                                                                                                                                                                                                                                                               |                                                  |
-| `room_role_request`     | P2  | `room`, `role`; records a role request, a room act of a viewer's seat asking the owner for a wider role, which enters the owner's Needs you as Q3 (LANE-10, LANE-16)                                                                                                                                                                                                                                                                                                                                                                               |                                                                                                                                                                                                                                                                                                                                                               |                                                  |
-| `room_summary_request`  | P1  | `room`, `size` (model tokens wanted); records a summary request, a room act any role may take, which the facilitator answers with a room summary written through its node's CLI (§9.5; LANE-16, LANE-33)                                                                                                                                                                                                                                                                                                                                           |                                                                                                                                                                                                                                                                                                                                                               |                                                  |
-| `room_summary_get`      | P1  | `room`, `size` (model tokens wanted, capped by `room_summary.max_model_tokens`); returns the facilitator's latest room summary within that size, each statement linked to its events by address, in the envelope, or none when none fits; a recall tool, it records a recall event (RCL-07) and writes no room summary, and ParleyInn writes none itself (LANE-33)                                                                                                                                                                                 |                                                                                                                                                                                                                                                                                                                                                               |                                                  |
+- `event_search`
+  - Pri: P0
+  - Parameters: `query` (string, literal terms), `any_of` / `all_of` / `phrase`
+    (optional structured operators), `scope` (`run` | `room` | `rooms`; default
+    `run`), `room`, `run` (a run id within the scope), `provenance[]`, `kind[]`,
+    `trust`, `since`, `until`, `k`
+  - Returns: Envelope of hits: `address`, run, provenance, trust, flags, kind,
+    preview, score
+  - Limits: k ≤ 50; 2 s deadline
+- `event_expand`
+  - Pri: P0
+  - Parameters: `range` (an address range in any shown form, or two addresses,
+    RCL-08), `scope` (default `run`), `room`, `cursor`
+  - Returns: Envelope of full events in range, payloads resolved
+  - Limits: 8,000 model tokens per call; continuation cursor
+- `event_get`
+  - Pri: P0
+  - Parameters: `address` (RCL-08), `scope` (default `run`), `room`, `cursor`
+  - Returns: Envelope with one full event
+  - Limits: 8,000 model tokens per call
+- `landmark_list`
+  - Pri: P0
+  - Parameters: `scope` (default `run`), `room`, `tier`
+  - Returns: Landmark blocks with address ranges, in the envelope
+  - Limits: 4,000 model tokens
+- `pin_list`
+  - Pri: P0
+  - Parameters: `scope` (default `run`), `room` (optional, P1)
+  - Returns: Without `room`: the qualifying pins (PIN-10) that restore to the
+    calling agent and its pending pin candidates (candidates marked), in the
+    envelope. With `room`: the room's pins, intent first, each with its pin type
+    and pin versions, each version with its author's seat id and seat kind,
+    stamps and key fingerprint, in the envelope (LANE-26, LANE-27)
+  - Limits: —
+- `stat_list`
+  - Pri: P0
+  - Parameters: `scope` (default `run`), `room`
+  - Returns: Event counts, runs, compactions and recall counts within the
+    caller's recall scope, in the envelope marked structural; a recall tool, it
+    records a recall event (RCL-07)
+  - Limits: —
+- `mcp_server_get`
+  - Pri: P0
+  - Parameters: —
+  - Returns: `session_binding` (`held` or `not_held`), `search_index`
+    (`readable` or `unreadable`), `searches_timed_out` and `version`, as closed
+    words and counts and no recalled content; no envelope
+  - Limits: —
+- `pin_candidate_propose`
+  - Pri: P1
+  - Parameters: `text`, `type`, `reason`
+  - Returns: Pin-candidate id; states that only its principal's confirmation
+    makes it a pin, the owner's alone for an intent or a criterion (PIN-05,
+    LANE-20)
+  - Limits: 1,000 characters
+- `kernel_exec`
+  - Pri: P1
+  - Parameters: `code`
+  - Returns: Envelope with the last row-returning statement's rows, error,
+    kernel variables changed
+  - Limits: CMP-05, CMP-06
+- `kernel_variable_list`
+  - Pri: P1
+  - Parameters: —
+  - Returns: Names, types and sizes of the run's kernel variables
+  - Limits: —
+- `kernel_reset`
+  - Pri: P1
+  - Parameters: —
+  - Returns: Confirmation
+  - Limits: —
+- `room_get`
+  - Pri: P1
+  - Parameters: `room`, `id` (optional); without `id`, returns the closed field
+    set of VIEW-15 in the envelope marked structural; with `id`, returns one
+    act, post, pin version, question or reason by id, in the envelope (VIEW-15,
+    LANE-25, LANE-30); a recall tool, it records a recall event (RCL-07)
+- `room_post`
+  - Pri: P1
+  - Parameters: `text`, `room` (optional target room, LANE-29); writes a `post`,
+    always untrusted (PRV-01)
+- `delegation_start`
+  - Pri: P1
+  - Parameters: `target`, `task`; delegates under a delegation grant in force
+    (OWN-23), refused without one
+- `delegation_get`
+  - Pri: P1
+  - Parameters: `delegation`; returns the delegate report in the envelope
+    (OWN-25)
+- `room_link`
+  - Pri: P1
+  - Parameters: `room` and one qualified link: `branch` records a branch link
+    (LANE-01); `range` with a `post` or `pin` records a range link to a marked
+    range; or `result` (the address of one of the agent's own results) with
+    `criteria` (criterion ids, each with the intent version it belongs to)
+    records a criterion link from the result to each criterion of its own room's
+    intent, never across rooms, which leaves the result's evidence class as it
+    was: a delegated task for another room traces through a delegation link
+    (LANE-16, LANE-21, OWN-24)
+- `room_join_request`
+  - Pri: P1
+  - Parameters: `room`; records a join request, a room act of the run's
+    personal-room seat naming the room, checked against the room's admission and
+    needing the run's principal's acceptance unless that principal asked for the
+    join (LANE-23, LANE-24); until the rest of LANE-23 ships (M7, §12.2), one
+    made without that ask is refused, audited and counted; returns the seat id
+    once it takes effect
+- `room_leave`
+  - Pri: P1
+  - Parameters: `room`; records the seat's leave (LANE-23)
+- `room_pin`
+  - Pri: P1
+  - Parameters: `room`, `text`, `type`; pins from the run seat, a room act on a
+    run-seat pin, an active pin with provenance `assistant` that restores to no
+    agent until a principal stamps a pin version of it (LANE-26, LANE-32); no
+    MCP tool adds a pin that restores, and no room act changes any restore
+    block; a `type` of `intent` or `verdict` is refused, since only a principal
+    act pins one (LANE-26, OWN-27)
+- `room_edit`
+  - Pri: P1
+  - Parameters: `room`, `pin`, `text`; adds an unstamped pin version to one of
+    the run seat's own pins, a room act; the new version restores to no agent
+    until stamped (LANE-26, LANE-32); a stamped earlier version keeps restoring
+    to its stamper's agents, and the stamper gets a Needs you item, audited; it
+    edits no other pin
+- `room_unpin`
+  - Pri: P1
+  - Parameters: `room`, `pin`; unpins one of the run seat's own pins, a room act
+    that takes the pin off the room's pin list (LANE-26); every stamped version
+    keeps restoring to its stamper's agents until the stamper unstamps it, and
+    the stamper gets a Needs you item, audited (LANE-32); it unpins no other
+    pin, since only a pin's author or its author's principal unpins one
+- `room_create`
+  - Pri: P1
+  - Parameters: `title`; creates a room owned by the agent's principal and
+    returns its id; the calling run's new run seat signs the create room act as
+    its writer's first act, which is that seat's add: the seat is a contributor
+    (LANE-16) and a member until a kick revokes it, a bar covers it or it
+    leaves, like any add, and the run's events go there while it works on a
+    branch the room names and that seat is a member with work (LANE-01, LANE-23)
+- `room_present`
+  - Pri: P1
+  - Parameters: `room`, `presentation`, `branch`; puts the presentation in the
+    outcome window, with the seat and branch (LANE-16, VIEW-22)
+- `room_pick`
+  - Pri: P1
+  - Parameters: `room`, `presentation`; chooses which presentation the outcome
+    window shows, moderators only; concurrent picks resolve by pick order
+    (LANE-16, LANE-31, VIEW-22)
+- `room_kick`
+  - Pri: P1
+  - Parameters: `room`, `seat`, `reason`; moderators only, an appointed
+    moderator within SEC-32 (LANE-16, LANE-25)
+- `room_bar`
+  - Pri: P1
+  - Parameters: `room`, `key` (a principal key), `reason`, `expiry` (optional);
+    moderators only, an appointed moderator within SEC-32 (LANE-16, LANE-25)
+- `room_mute`
+  - Pri: P1
+  - Parameters: `room`, `seat` (optional; the whole room when omitted),
+    `reason`, `expiry` (optional); moderators only, an appointed moderator
+    within SEC-32, which never mutes the whole room (LANE-16, LANE-25)
+- `room_role_request`
+  - Pri: P2
+  - Parameters: `room`, `role`; records a role request, a room act of a viewer's
+    seat asking the owner for a wider role, which enters the owner's Needs you
+    as Q3 (LANE-10, LANE-16)
+- `room_summary_request`
+  - Pri: P1
+  - Parameters: `room`, `size` (model tokens wanted); records a summary request,
+    a room act any role may take, which the facilitator answers with a room
+    summary written through its node's CLI (§9.5; LANE-16, LANE-33)
+- `room_summary_get`
+  - Pri: P1
+  - Parameters: `room`, `size` (model tokens wanted, capped by
+    `room_summary.max_model_tokens`); returns the facilitator's latest room
+    summary within that size, each statement linked to its events by address, in
+    the envelope, or none when none fits; a recall tool, it records a recall
+    event (RCL-07) and writes no room summary, and ParleyInn writes none itself
+    (LANE-33)
 
 No MCP tool unbars, unmutes or makes a list removal: an appointed moderator does
 none of them (SEC-32), and any other moderator takes those room acts through the

@@ -1,0 +1,71 @@
+---
+n: 11
+title: "A specialist reads the requirements its files touch in its context"
+status: "✅"
+result: true
+summary: >-
+  ENG-28 gains a clause: each specialist's review context quotes whole
+  each touched requirement its files change or name, one sentence or
+  clause per line. A requirement is one table line a search shows only
+  in part, and `lang-gherkin` had spent its twenty turns searching
+  ENG-28's 13,856 characters. It now weighs each changed step against
+  main's step, then against its row as its context quotes it, and
+  leaves to CI the tags and bindings CI proves. The ENG-28 context
+  check, two drift cases and a new `lang-gherkin` case land with it.
+---
+# Phase 11 handoff
+
+## Done
+
+- The review bundle names the touched ids each changed file holds or
+  names. Each context quotes those requirements whole, one sentence or
+  clause per line, as the pull request has them, or as main has one it
+  removes.
+- ENG-28's row and its scenario step say so. The ENG-28 context check
+  holds the context of a change that names ENG-28 to its row, quoted
+  whole at its place.
+- `lang-gherkin` reads its diff and its context and searches nothing.
+  It leaves to CI the tags and bindings that the scenario gate test and
+  the scenario run prove.
+- With its row whole in front of it, `lang-gherkin` read a reworded
+  step as checking less than its row, as main's step does too. It now
+  weighs a changed step against main's step first: one that says what
+  main's step said is no finding.
+
+## Verified
+
+- Unit tests of `review-bundle` and `engineering` pass, with clippy
+  denying warnings.
+- The cucumber scenario `@ENG-28` and the scenario gate test pass.
+- The drift suite catches the two new cases and the fourteen others
+  that inject the files this phase changes.
+- `review-eval run --component lang-gherkin` on haiku, on main with the
+  new case. Before: 5 of 5 cases, 10 of 10 runs, 5.2 turns a run, the new
+  case in 8 turns a run and the reworded step's clean case in 10 and 8.
+  With the rows quoted and each step weighed against its row alone: 4 of 5
+  cases, 9 of 11 runs, 3.3 turns a run; the clean case failed 2 of 3.
+  After: 5 of 5 cases, 10 of 10 runs, 3.2 turns a run, the new case in 3
+  and 3. With six repetitions each, the clean case, the new case and the
+  injection case passed 18 of 18 runs.
+- `scripts/review-local.sh` against pull request 154's head, before
+  the change moved to main: 11 of 11 agents consulted, and the agents
+  approve, at 0.57 USD; `lang-gherkin` read its diff and context and
+  answered in 3 turns. Its three nits are taken: two tests for arms of
+  the quote no test took, and the hub's entry for the review context.
+- `scripts/review-local.sh` against main: 11 of 11 agents consulted,
+  and the agents approve, at 0.52 USD; `lang-gherkin` answered in 3
+  turns. Its one nit is taken: the evaluation's page now says what a
+  context quotes.
+
+## Not done
+
+- The shared section of the SRS section specialists still has them
+  search for a row a diff names but does not change.
+- `lang-gherkin` puts its finding lines in its last message beside its
+  outcome in most runs, a slip the evaluation counts, as before.
+
+## Next
+
+- Land before pull request 154. A review runs main's bundle and
+  agents, so 154's next review quotes its specialists' rows; see it
+  run without a specialist's searches.
