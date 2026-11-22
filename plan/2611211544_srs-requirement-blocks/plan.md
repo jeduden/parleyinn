@@ -173,6 +173,7 @@ The review's agents MUST have no credential that can approve or write.
 | 9     | sonnet | Four tables are lists, word for word; the gates pass                                                                                                                 |
 | 10    | sonnet | The commands are a list, word for word; mdsmith passes                                                                                                               |
 | 11    | sonnet | Appendix B is a list, word for word; its gate passes                                                                                                                 |
+| 12    | sonnet | The tools are a list, word for word; RCL-01 passes                                                                                                                   |
 
 ## Phases
 
@@ -219,6 +220,7 @@ footer: |
 |     | ↳      | The 83 commands of §9.5 are each a list item, word for word as the table held them, their purposes one sentence a line at 80 columns. The section falls from 134,889 bytes in 140 lines to 26,179 in 384, where each row was padded to 1,545 characters. The srs kind's line length is stern, so only a word may run past 80 columns. No requirement changes, and no scenario comes off @pending.                                                                                                                                         |
 | 11  | ✅     | [Appendix B written as a list](phase-11.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 |     | ↳      | Appendix B's coverage of the ten invariants is a list, an item per invariant holding its row's requirement ids word for word, wrapped at 80 columns, where each row was padded to 860 characters. The appendix falls from 11,348 bytes in 35 lines to 4,522 in 72. Its gate reads the list. No requirement changes, and no scenario comes off @pending.                                                                                                                                                                                   |
+| 12  | ✅     | [The MCP tools written as a list](phase-12.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 <?/catalog?>
 
 ## Acceptance Criteria
