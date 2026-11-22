@@ -3,7 +3,7 @@
 //! under it, and its text, which runs to the next heading or table.
 
 use crate::is_requirement_id;
-use crate::table::{fence_after, fence_marker};
+use crate::table::{fence_after, fence_marker, opens_table};
 
 /// One requirement written as a block.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -33,12 +33,16 @@ enum Part {
 
 /// Reads every block in `body`. A line inside a fenced code block is
 /// never a heading or a table, so a block quoted in an example is none.
+/// A table opens on a pipe row with a delimiter row under it, as
+/// [`crate::tables`] reads one, so a line of the text that starts with
+/// a pipe stays text, as it does in Markdown.
 #[must_use]
 pub fn blocks(body: &str) -> Vec<Block> {
+    let lines: Vec<&str> = body.lines().collect();
     let mut out = Vec::new();
     let mut open: Option<(Block, Part)> = None;
     let mut fence = None;
-    for (i, line) in body.lines().enumerate() {
+    for (i, line) in lines.iter().copied().enumerate() {
         let trimmed = line.trim();
         let fenced = fence.is_some() || fence_marker(trimmed).is_some();
         fence = fence_after(fence, trimmed);
@@ -54,7 +58,7 @@ pub fn blocks(body: &str) -> Vec<Block> {
             });
             continue;
         }
-        if !fenced && trimmed.starts_with('|') {
+        if !fenced && opens_table(trimmed, lines.get(i + 1).copied()) {
             out.extend(open.take().map(|(block, _)| block));
         }
         if let Some((block, part)) = open.as_mut() {

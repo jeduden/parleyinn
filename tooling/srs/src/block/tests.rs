@@ -97,6 +97,13 @@ fn a_table_ends_the_block_before_it() {
 }
 
 #[test]
+fn a_pipe_line_with_no_delimiter_row_under_it_is_part_of_the_text() {
+    let got = blocks("## REC-01\n\n- Pri: P0\n\nText\n| and more.\n| A |\n");
+
+    assert_eq!(got[0].text, "Text | and more. | A |");
+}
+
+#[test]
 fn a_fence_inside_a_block_is_part_of_its_text() {
     let got = blocks("## REC-01\n\n- Pri: P0\n\nText.\n```\n## REC-02\n| A |\n```\nMore.\n");
 

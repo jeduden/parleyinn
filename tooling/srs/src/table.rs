@@ -32,10 +32,7 @@ pub fn tables(body: &str) -> Vec<Table> {
             i += 1;
             continue;
         }
-        if fence.is_some()
-            || !is_pipe_row(trimmed)
-            || !lines.get(i + 1).is_some_and(|next| is_delimiter_row(next))
-        {
+        if fence.is_some() || !opens_table(trimmed, lines.get(i + 1).copied()) {
             i += 1;
             continue;
         }
@@ -82,6 +79,12 @@ pub fn fence_after<'a>(open: Option<&'a str>, line: &'a str) -> Option<&'a str> 
         }
         (open, Some(_)) => open,
     }
+}
+
+/// Whether `line`, with `next` under it, opens a table: a pipe row with
+/// a delimiter row under it.
+pub(crate) fn opens_table(line: &str, next: Option<&str>) -> bool {
+    is_pipe_row(line.trim()) && next.is_some_and(is_delimiter_row)
 }
 
 fn is_pipe_row(line: &str) -> bool {
