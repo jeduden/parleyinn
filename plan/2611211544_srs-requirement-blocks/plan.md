@@ -148,8 +148,11 @@ The review's agents MUST have no credential that can approve or write.
    crate's stated responsibility speak of a requirement where they say
    row or table.
 5. The other wide tables follow, each with the reader its gate uses:
-   the threats, the boundary register, the command-line interface, the
-   delivery plan, the open questions, the change log and Appendices A
+   every table with a row over 500 characters, the most a search shows
+   of a line. They are the change log, the delivery plan's milestones,
+   the open questions, the command-line interface, the reference
+   architecture's components and decisions, the threats and the
+   residual risks, the store's tables, the MCP tools and Appendices A
    and B.
 6. Each requirement the srs kind lists past 50 lines is split into
    requirements that fit, each with its scenario, and leaves the
@@ -165,6 +168,7 @@ The review's agents MUST have no credential that can approve or write.
 | 4     | sonnet | Main's review bundle shows no requirement of the three sections changed, and mdsmith, the gates and the local review pass                                            |
 | 5     | sonnet | Main's bundle shows no requirement changed; its drift cases are caught                                                                                               |
 | 6     | sonnet | The change log is a list, word for word; the gates pass                                                                                                              |
+| 7     | sonnet | The milestones are headings, word for word; the gates pass                                                                                                           |
 
 ## Phases
 
@@ -201,6 +205,8 @@ footer: |
 |     | ↳      | The 64 requirements of security, the boundary register's own and engineering quality are each written as a block, and none changes: main's review bundle shows each with main's text alone. The three drift cases that quoted §10's rows inject into its blocks and are caught. Every requirement of task 3's fourteen sections is now a block. No scenario comes off @pending.                                                                                                                                                           |
 | 6   | ✅     | [The change log written as a list](phase-6.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 |     | ↳      | The SRS's change log is a list, its 48 entries each a version, a date and a summary one sentence a line, word for word as the table held them. The index falls from 611,025 bytes in 136 lines to 41,442 in 521, and an entry no longer repads the others. No requirement changes, and no scenario comes off @pending.                                                                                                                                                                                                                    |
+| 7   | ✅     | [The delivery plan's milestones written as headings](phase-7.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+|     | ↳      | The delivery plan's nine milestones are each a heading, their scope and exit criteria a list of two fields wrapped at 80 columns, word for word as the table held them. The section falls from 67,639 bytes in 93 lines to 25,825 in 272, where a row reached 4,909 characters. No requirement changes, and no scenario comes off @pending.                                                                                                                                                                                               |
 <?/catalog?>
 
 ## Acceptance Criteria
