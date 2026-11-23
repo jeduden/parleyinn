@@ -152,7 +152,7 @@ fn build(
 
 /// The part of `diff` a specialist whose files are `scope` reads: those
 /// files' sections, or the whole diff when it has none of its own, as a
-/// specialist a row brings may not; either without the hunks inside a
+/// specialist a requirement brings may not; either without the hunks inside a
 /// copy an `<?include?>` makes of its source in the tree `tree` reads.
 fn diff_for(diff: &str, scope: &BTreeSet<String>, tree: &dyn Fn(&str) -> Option<String>) -> String {
     let own = if scope.is_empty() {

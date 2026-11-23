@@ -15,10 +15,10 @@ pub const INVARIANTS: &str = "docs/srs/invariants.md";
 /// The requirement whose text names the requirements marked for I2
 /// review.
 const ENG_29: &str = "ENG-29";
-/// How a finding names a change to ENG-29's row: the row holds the list
-/// of requirements marked for I2 review, so a change to it could take
-/// one off that list.
-const OWN_ROW: &str = "ENG-29's own row";
+/// How a finding names a change to ENG-29 itself: it holds the list of
+/// requirements marked for I2 review, so a change to it could take one
+/// off that list.
+const OWN: &str = "ENG-29 itself";
 
 /// Where the decision records live.
 const ADR_DIR: &str = "docs/adr/";
@@ -28,8 +28,8 @@ const ADR_DIR: &str = "docs/adr/";
 const NOT_LIGHT: [&str; 3] = ["docs/domain-model/", "plan/", "features/"];
 
 /// The code no stakeholder path holds that still reviews deep: the
-/// gates. Each crate's reach test and the security-sensitive crates the
-/// ENG-11 row names join it.
+/// gates. Each crate's reach test and the security-sensitive crates
+/// ENG-11 names join it.
 const DEEP_CODE: [&str; 1] = ["tooling/"];
 
 /// The text no stakeholder path holds that still reviews deep, since
@@ -135,7 +135,7 @@ pub struct Analysis {
     /// or one a changed line names, that either tree defines.
     pub touched: Vec<String>,
     /// Each changed file with the touched ids it holds or names: an SRS
-    /// file each row it changes, a feature file each scenario it
+    /// file each requirement it changes, a feature file each scenario it
     /// changes, and any file each id an added or removed line names.
     pub named: BTreeMap<String, BTreeSet<String>>,
     pub findings: Vec<Finding>,
@@ -197,7 +197,7 @@ pub fn analyse(base: &Snapshot, head: &Snapshot, diff: &str, consents: &[String]
     findings.extend(lifted_bans(diff));
     let crates = security_crates(base);
     if crates.is_none() {
-        let path = row_path(base, ENG_11).unwrap_or_else(|| "docs/srs".to_owned());
+        let path = requirement_path(base, ENG_11).unwrap_or_else(|| "docs/srs".to_owned());
         findings.push(nit(&path, NO_SECURITY_CRATES));
     }
     findings.sort();
@@ -208,22 +208,22 @@ pub fn analyse(base: &Snapshot, head: &Snapshot, diff: &str, consents: &[String]
     let deep = paths
         .iter()
         .any(|p| deep_code(&crates, p) || deep_unowned(p));
-    // The rows that bring their section's specialist: those the change
-    // edits, and those code names; a row Markdown only quotes is in the
-    // bundle but brings no one.
+    // The requirements that bring their section's specialist: those the
+    // change edits, and those code names; one Markdown only quotes is in
+    // the bundle but brings no one.
     let named: BTreeSet<String> = requirements
         .keys()
         .chain(scenarios.keys())
         .cloned()
         .chain(diff::ids_in_code(diff))
         .collect();
-    let rows: Vec<&srs::Requirement> = touched
+    let bringing: Vec<&srs::Requirement> = touched
         .iter()
         .filter(|id| named.contains(*id))
         .filter_map(|id| requirement(head, id).or_else(|| requirement(base, id)))
         .collect();
     let class = classify(&paths, deep || !owned.is_empty(), &unparsed);
-    let scopes = dispatch::scopes(&paths, &rows, &crates, &diff::ids_by_file(diff));
+    let scopes = dispatch::scopes(&paths, &bringing, &crates, &diff::ids_by_file(diff));
     let mut routed = dispatch::grouped(&scopes);
     if routed.is_empty() {
         // No rule routes the change: one generalist still reads it.
@@ -297,10 +297,10 @@ fn stakeholder_paths(owned: &[String], unconsented: &[&String]) -> Option<Findin
 /// What an unparsed diff header weighs.
 const UNPARSED: &str = "the paths this diff header names do not read, so the review class is deep";
 
-/// What main's ENG-11 row weighs when it names no security-sensitive
-/// crate list the analysis can read.
+/// What main's ENG-11 weighs when it names no security-sensitive crate
+/// list the analysis can read.
 const NO_SECURITY_CRATES: &str =
-    "the ENG-11 row names no security-sensitive crates, so every crate reviews deep";
+    "ENG-11 names no security-sensitive crates, so every crate reviews deep";
 
 /// A nit at `path` as a whole.
 fn nit(path: &str, body: &str) -> Finding {
@@ -322,16 +322,16 @@ fn lifted_bans(diff: &str) -> BTreeSet<Finding> {
         .collect()
 }
 
-/// The row `id` of `snapshot`, when it defines one.
+/// The requirement `id` of `snapshot`, when it defines one.
 fn requirement<'a>(snapshot: &'a Snapshot, id: &str) -> Option<&'a srs::Requirement> {
     snapshot.requirements.iter().find(|r| r.id == id)
 }
 
 /// Each changed file with the `touched` ids it holds or names
-/// ([`Analysis::named`]): the file of each row in `requirements` and of
-/// each scenario in `scenarios`, as the pull request has it or main
-/// when the pull request removes it, and each file of `diff` with the
-/// ids its added or removed lines name.
+/// ([`Analysis::named`]): the file of each requirement in
+/// `requirements` and of each scenario in `scenarios`, as the pull
+/// request has it or main when the pull request removes it, and each
+/// file of `diff` with the ids its added or removed lines name.
 fn named_by_file(
     base: &Snapshot,
     head: &Snapshot,
@@ -340,7 +340,7 @@ fn named_by_file(
     diff: &str,
     touched: &BTreeSet<String>,
 ) -> BTreeMap<String, BTreeSet<String>> {
-    let row = |id: &String| requirement(head, id).or_else(|| requirement(base, id));
+    let defined = |id: &String| requirement(head, id).or_else(|| requirement(base, id));
     let scenario = |id: &String| {
         let find = |s: &Snapshot| {
             s.scenarios
@@ -351,7 +351,7 @@ fn named_by_file(
         find(head).or_else(|| find(base))
     };
     let held = (requirements.keys())
-        .filter_map(|id| row(id).map(|r| (r.path.clone(), id)))
+        .filter_map(|id| defined(id).map(|r| (r.path.clone(), id)))
         .chain(
             scenarios
                 .keys()
@@ -370,7 +370,7 @@ fn named_by_file(
     out
 }
 
-/// The security-sensitive crates the ENG-11 row of `snapshot` names;
+/// The security-sensitive crates ENG-11 names in `snapshot`;
 /// `None` when it names no list or an empty one, so the caller fails
 /// closed rather than treat no crate as security-sensitive.
 fn security_crates(snapshot: &Snapshot) -> Option<Vec<String>> {
@@ -445,10 +445,10 @@ fn changes<V: PartialEq>(
         .collect()
 }
 
-/// The requirements whose row differs: priority, method, traces or
-/// text. Where a row sits does not count.
+/// The requirements whose fields or text differ: priority, method,
+/// traces or text. Where a requirement sits does not count.
 fn requirement_changes(base: &Snapshot, head: &Snapshot) -> BTreeMap<String, Change> {
-    let row = |r: &srs::Requirement| {
+    let compared = |r: &srs::Requirement| {
         (
             r.priority.clone(),
             r.verify.clone(),
@@ -457,8 +457,8 @@ fn requirement_changes(base: &Snapshot, head: &Snapshot) -> BTreeMap<String, Cha
         )
     };
     changes(
-        &keyed(&base.requirements, |r| r.id.as_str(), row),
-        &keyed(&head.requirements, |r| r.id.as_str(), row),
+        &keyed(&base.requirements, |r| r.id.as_str(), compared),
+        &keyed(&head.requirements, |r| r.id.as_str(), compared),
     )
 }
 
@@ -513,7 +513,7 @@ fn ratchet(base: &Snapshot, head: &Snapshot) -> Vec<Finding> {
 }
 
 /// ENG-29: a change to an invariant, to a requirement ENG-29 marks for
-/// I2 review, or to ENG-29's own row, which holds that list, lands only
+/// I2 review, or to ENG-29 itself, which holds that list, lands only
 /// with an accepted decision record, changed
 /// in the same pull request, that names ENG-29 and what it covers, and
 /// with the stakeholder's consent: `consent`, a consenting comment on
@@ -527,13 +527,13 @@ fn eng_29(
     consent: bool,
 ) -> Guard {
     let marked = marked_for_i2_review(base);
-    let rows: Vec<&String> = requirements
+    let changed: Vec<&String> = requirements
         .keys()
         .filter(|id| marked.contains(id))
         .collect();
     let invariant = base.invariants != head.invariants || paths.iter().any(|p| p == INVARIANTS);
     let own = requirements.contains_key(ENG_29);
-    if rows.is_empty() && !invariant && !own {
+    if changed.is_empty() && !invariant && !own {
         return Guard::default();
     }
     let mut names = vec![ENG_29];
@@ -543,10 +543,10 @@ fn eng_29(
         guarded.push("an invariant");
     }
     if own {
-        guarded.push(OWN_ROW);
+        guarded.push(OWN);
     }
-    names.extend(rows.iter().map(|id| id.as_str()));
-    guarded.extend(rows.iter().map(|id| id.as_str()));
+    names.extend(changed.iter().map(|id| id.as_str()));
+    guarded.extend(changed.iter().map(|id| id.as_str()));
     let record = paths
         .iter()
         .filter(|p| p.starts_with(ADR_DIR))
@@ -555,10 +555,11 @@ fn eng_29(
     let path = if invariant {
         INVARIANTS.to_owned()
     } else {
-        rows.first()
+        changed
+            .first()
             .map(|id| id.as_str())
             .or(own.then_some(ENG_29))
-            .and_then(|id| row_path(head, id).or_else(|| row_path(base, id)))
+            .and_then(|id| requirement_path(head, id).or_else(|| requirement_path(base, id)))
             .unwrap_or_default()
     };
     let finding = |missing: &str| Finding {
@@ -606,8 +607,8 @@ fn and_list(items: &[&str]) -> String {
     }
 }
 
-/// Where `tree` holds the row `id`.
-fn row_path(tree: &Snapshot, id: &str) -> Option<String> {
+/// Where `tree` holds the requirement `id`.
+fn requirement_path(tree: &Snapshot, id: &str) -> Option<String> {
     tree.requirements
         .iter()
         .find(|r| r.id == id)
@@ -634,7 +635,7 @@ fn covering(path: &str, body: &str, names: &[&str]) -> Option<Record> {
     })
 }
 
-/// The ids ENG-29's row names besides itself: the requirements marked
+/// The ids ENG-29 names besides itself: the requirements marked
 /// for I2 review.
 fn marked_for_i2_review(base: &Snapshot) -> Vec<String> {
     base.requirements

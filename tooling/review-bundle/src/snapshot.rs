@@ -1,5 +1,5 @@
-//! One tree's records, as the analysis reads them: the requirement
-//! rows, the scenarios, CODEOWNERS, the invariants and the decision
+//! One tree's records, as the analysis reads them: the requirements,
+//! the scenarios, CODEOWNERS, the invariants and the decision
 //! records. Paths are relative to the tree's root, so the two trees'
 //! records compare and findings name the file a reviewer opens.
 
@@ -25,7 +25,7 @@ pub struct Snapshot {
 /// What reading a tree can fail with.
 #[derive(Debug)]
 pub enum Error {
-    /// The requirement tables do not read.
+    /// The requirements do not read.
     Srs(srs::Error),
     /// The scenarios do not read.
     Scenarios(scenario::Error),
