@@ -2,7 +2,7 @@
 //! bijection with the requirement ids of the SRS: every requirement has
 //! exactly one tagged scenario, every scenario names a real
 //! requirement, and a scenario's priority and invariant tags agree with
-//! its requirement's row. The crate's `bdd` test target runs the
+//! its requirement's fields. The crate's `bdd` test target runs the
 //! scenarios through cucumber-rs. It is repository tooling and never
 //! links into a shipped executable.
 
