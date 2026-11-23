@@ -42,9 +42,13 @@ pub const EXCLUDED_SENTENCE: &str =
 /// finding cites: a finding is known by what the report's form fixes,
 /// its place and its ids, never by a word of its sentence.
 pub const TERMS_ID: &str = "ENG-35";
-/// What a derived defect adds to a requirement: a line of its own after
-/// its block's text.
-pub const ADDED_MUST: &str = "It MUST also record the change in the audit log.";
+/// What a derived defect adds to the requirement `id`: a line of its
+/// own after its block's text, a MUST that names its requirement and
+/// what it records, so its untested scenario is the one problem it
+/// plants.
+fn added_must(id: &str) -> String {
+    format!("Each failure to meet {id} MUST also be recorded in the audit log.")
+}
 
 /// The prefix of an open question's id, which is no requirement's: the
 /// report rule refuses it among a finding's ids.
@@ -209,7 +213,7 @@ fn title_line(path: &str, text: &str) -> Result<String, String> {
 /// after its text, and its id.
 fn first_requirement(text: &str) -> Option<(String, String, String)> {
     first_block(text).map(|(block, id)| {
-        let new = format!("{block}{ADDED_MUST}\n");
+        let new = format!("{block}{}\n", added_must(&id));
         (block, new, id)
     })
 }

@@ -306,13 +306,21 @@ fn a_defect_adds_a_must_after_the_first_block_s_text_and_expects_a_linked_findin
     assert_eq!(old, block);
     assert_eq!(
         new,
-        &format!("{block}It MUST also record the change in the audit log.\n")
+        &format!("{block}Each failure to meet SEC-01 MUST also be recorded in the audit log.\n")
     );
     assert_eq!(case.validate(dir.path()), Ok(()));
     assert_eq!(case.expect.outcome, vec!["findings"]);
     assert_eq!(case.expect.finding[0].ids, vec!["SEC-01"]);
     assert_eq!(case.expect.finding[0].form.as_deref(), Some("linked"));
     assert_eq!(case.expect.finding[0].severity, None);
+}
+
+#[test]
+fn the_added_must_names_its_requirement_and_what_it_records() {
+    assert_eq!(
+        added_must("REC-01"),
+        "Each failure to meet REC-01 MUST also be recorded in the audit log."
+    );
 }
 
 #[test]
