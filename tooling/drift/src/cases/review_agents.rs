@@ -400,9 +400,9 @@ pub(super) fn review_gate_cases() -> Vec<Case> {
             cargo_test(
                 "review-bundle",
                 "bundle",
-                "the_requirements_eng_29_marks_follow_its_row",
+                "the_requirements_eng_29_marks_follow_its_text",
             ),
-            "---- the_requirements_eng_29_marks_follow_its_row stdout ----",
+            "---- the_requirements_eng_29_marks_follow_its_text stdout ----",
         ),
         // The shared sections no longer a stakeholder path, a change to
         // one routes light; the failure prints the class the bundle chose.
