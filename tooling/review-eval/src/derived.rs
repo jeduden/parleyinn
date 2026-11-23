@@ -42,12 +42,48 @@ pub const EXCLUDED_SENTENCE: &str =
 /// finding cites: a finding is known by what the report's form fixes,
 /// its place and its ids, never by a word of its sentence.
 pub const TERMS_ID: &str = "ENG-35";
+/// The field of a requirement's block that names the invariants it
+/// serves, which the engineering requirements carry none of.
+const TRACES: &str = "- Traces: ";
+/// The invariant a failure recorded in the audit log serves.
+const AUDIT_TRACE: &str = "I6";
+
 /// What a derived defect adds to the requirement `id`: a line of its
 /// own after its block's text, a MUST that names its requirement and
-/// what it records, so its untested scenario is the one problem it
-/// plants.
-fn added_must(id: &str) -> String {
-    format!("Each failure to meet {id} MUST also be recorded in the audit log.")
+/// what it asks, so its untested scenario is the one problem it plants.
+/// One that traces invariants records each failure in the audit log,
+/// as I6 asks; an engineering requirement, which traces none, fails CI.
+fn added_must(id: &str, traced: bool) -> String {
+    if traced {
+        format!("Each failure to meet {id} MUST also be recorded in the audit log.")
+    } else {
+        format!("Each failure to meet {id} MUST also fail CI, naming {id}.")
+    }
+}
+
+/// `block` with `invariant` among those its Traces field names, in
+/// their order, so the MUST it gains serves only what it traces; left
+/// as it is when it names it already or carries no such field.
+fn with_trace(block: &str, invariant: &str) -> String {
+    block
+        .split_inclusive('\n')
+        .map(|line| {
+            let Some(rest) = line.strip_prefix(TRACES) else {
+                return line.to_owned();
+            };
+            let mut ids: Vec<&str> = rest
+                .split(',')
+                .map(str::trim)
+                .filter(|i| !i.is_empty() && *i != "—")
+                .collect();
+            if ids.contains(&invariant) {
+                return line.to_owned();
+            }
+            ids.push(invariant);
+            ids.sort_by_key(|i| i.trim_start_matches('I').parse::<u8>().unwrap_or(u8::MAX));
+            format!("{TRACES}{}\n", ids.join(", "))
+        })
+        .collect()
 }
 
 /// The prefix of an open question's id, which is no requirement's: the
@@ -210,10 +246,16 @@ fn title_line(path: &str, text: &str) -> Result<String, String> {
 
 /// The first requirement of a section with a priority, its first block:
 /// what it reads, what it reads with the MUST added on a line of its own
-/// after its text, and its id.
+/// after its text and the invariant that MUST serves among its traces,
+/// and its id.
 fn first_requirement(text: &str) -> Option<(String, String, String)> {
     first_block(text).map(|(block, id)| {
-        let new = format!("{block}{}\n", added_must(&id));
+        let traced = block.lines().any(|l| l.starts_with(TRACES));
+        let new = format!(
+            "{}{}\n",
+            with_trace(&block, AUDIT_TRACE),
+            added_must(&id, traced)
+        );
         (block, new, id)
     })
 }

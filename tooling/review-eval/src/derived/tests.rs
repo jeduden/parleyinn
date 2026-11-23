@@ -306,7 +306,8 @@ fn a_defect_adds_a_must_after_the_first_block_s_text_and_expects_a_linked_findin
     assert_eq!(old, block);
     assert_eq!(
         new,
-        &format!("{block}Each failure to meet SEC-01 MUST also be recorded in the audit log.\n")
+        "## SEC-01\n\n- Pri: P0\n- Ver: T\n- Traces: I4, I6\n\nThe core opens\nno socket.\n\
+         Each failure to meet SEC-01 MUST also be recorded in the audit log.\n"
     );
     assert_eq!(case.validate(dir.path()), Ok(()));
     assert_eq!(case.expect.outcome, vec!["findings"]);
@@ -316,10 +317,50 @@ fn a_defect_adds_a_must_after_the_first_block_s_text_and_expects_a_linked_findin
 }
 
 #[test]
-fn the_added_must_names_its_requirement_and_what_it_records() {
+fn the_added_must_names_its_requirement_and_what_it_asks() {
     assert_eq!(
-        added_must("REC-01"),
+        added_must("REC-01", true),
         "Each failure to meet REC-01 MUST also be recorded in the audit log."
+    );
+    assert_eq!(
+        added_must("ENG-01", false),
+        "Each failure to meet ENG-01 MUST also fail CI, naming ENG-01."
+    );
+}
+
+#[test]
+fn a_trace_joins_the_invariants_a_block_traces_in_their_order() {
+    let block = |traces: &str| format!("## REC-01\n\n- Pri: P0\n{traces}\nIt MUST ingest.\n");
+    assert_eq!(
+        with_trace(&block("- Traces: I1, I10\n"), "I6"),
+        block("- Traces: I1, I6, I10\n")
+    );
+    // A field that names none, as "—" or as nothing, names it alone.
+    assert_eq!(
+        with_trace(&block("- Traces: —\n"), "I6"),
+        block("- Traces: I6\n")
+    );
+    assert_eq!(
+        with_trace(&block("- Traces: \n"), "I6"),
+        block("- Traces: I6\n")
+    );
+    // A block that traces it already, in any order, is left as it is.
+    let traced = block("- Traces: I10, I6\n");
+    assert_eq!(with_trace(&traced, "I6"), traced);
+    let untraced = block("- Ver: I\n");
+    assert_eq!(with_trace(&untraced, "I6"), untraced);
+}
+
+#[test]
+fn an_engineering_requirement_s_defect_fails_ci_and_traces_nothing() {
+    let block = "## ENG-01\n\n- Pri: P0\n- Ver: I\n\nIt MUST pin.\n";
+    assert_eq!(
+        first_requirement(&format!("# 10\n\n{block}")),
+        Some((
+            block.to_owned(),
+            format!("{block}Each failure to meet ENG-01 MUST also fail CI, naming ENG-01.\n"),
+            "ENG-01".to_owned()
+        ))
     );
 }
 
