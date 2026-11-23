@@ -1,7 +1,7 @@
 Feature: Engineering quality (ENG)
 
   The scenarios for SRS §10, one per requirement, tagged with its id and
-  priority; the engineering tables carry no Traces column. A scenario
+  priority; the engineering requirements carry no Traces field. A scenario
   still tagged @pending is declared but not yet written: its steps are
   bound when the plan that implements the requirement lands. The
   scenarios without @pending inspect the repository itself and run on
@@ -406,7 +406,7 @@ Feature: Engineering quality (ENG)
   @ENG-34 @P0
   Scenario: the review bundle flags a file past its line limit and a file no specialist reads
     Given the repository checkout
-    Then the review bundle's line limits are those the ENG-34 row states
+    Then the review bundle's line limits are those ENG-34 states
     When the review bundle is built for a change that adds a Rust file past its limit and a file no review specialist reads
     Then its deterministic findings hold a nit at the Rust file in the finding form, citing ENG-34
     And its deterministic findings hold a nit at the unread file in the finding form, citing ENG-28

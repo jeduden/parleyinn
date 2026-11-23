@@ -4,7 +4,7 @@
 //! yet stays past its limit must have its listed lines lowered, so a
 //! regrowth cannot hide behind an old number. A listed file that now
 //! fits, or is gone, must leave the size list, so it only shrinks. The
-//! limits are the review bundle's, which the ENG-34 row states; the
+//! limits are the review bundle's, which ENG-34 states; the
 //! review bundle's own finding for a changed file past its limit stays
 //! a nit.
 
