@@ -1,7 +1,7 @@
 ---
 n: 17
 title: "The review's agents say requirement"
-status: "🔳"
+status: "✅"
 result: false
 ---
 # Phase 17: The review's agents say requirement
@@ -15,8 +15,9 @@ their name.
 The shared sections. srs-section-checks.md holds each touched
 requirement to the section, its scenario, the code and the invariants,
 and a finding on one ends in its id. review-spec.md and review-code.md
-ask their questions of each touched requirement. outcome-answer.md,
-which the report sections include, says a fine place gets no line.
+ask their questions of each touched requirement. outcome-answer.md and
+specialist-report.md, the report sections' two copies of the answer
+rule, say what is fine gets no line.
 
 The agents' own text. Each SRS specialist reads only the requirements
 and text the pull request touches or names. lang-gherkin holds a
@@ -24,11 +25,14 @@ scenario to its requirement as the context quotes it, performance reads
 the requirements a change touches, and test-engineer-end-to-end proves
 the requirement's MUST.
 
-RED. None: the wording asks nothing new of a reviewer, so main's cases
-are the gate, each run on its component's model.
+RED. None: no case can fail first. A slip fails no run, and no case
+plants an id a specialist should be unsure of. Main's cases are the
+gate, each run on its component's model, beside the same cases run on
+phase 16's text.
 
-GREEN. mdsmith writes every agent file from its shared sections again,
-and each component the evaluation plans passes its cases on its model.
+GREEN. mdsmith writes every agent file from its shared sections again.
+Each component the evaluation plans passes its cases on its model, and
+so does each the plan covers through a component on another model.
 
 Gate. Each of these is recorded in the handoff:
 
