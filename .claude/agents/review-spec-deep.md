@@ -38,7 +38,8 @@ row: "- [`{name}`](../../docs/agents/{filename})"
 ## What you weigh
 
 - Does each touched requirement, its scenario and the scenario's
-  bindings say the same thing, and does a live step exercise its text?
+  bindings say the same thing, and does a live step exercise the
+  requirement's text?
 - Is every requirement id covered by exactly one scenario, with the
   requirement's priority and invariants?
 - Does every name in the change come from the domain model, and does
