@@ -1,7 +1,7 @@
 ---
 n: 16
 title: "The tools, the scenarios and the docs say requirement"
-status: "🔳"
+status: "✅"
 result: false
 ---
 # Phase 16: The tools, the scenarios and the docs say requirement
@@ -26,9 +26,9 @@ no change to its scenario is `defect-requirement-without-scenario`.
 The doc comments and the names of the crates that read the SRS follow.
 
 The scenarios. The ASM, NFR and ENG feature files describe their
-requirements without a table, and ENG-34's step reads "the line limits
-ENG-34 states", with its binding and the drift case that quotes the
-check's message.
+requirements without a table, and ENG-34's step reads "the review
+bundle's line limits are those ENG-34 states", with its binding and
+the drift case that quotes the check's message.
 
 The docs. testing.md says a requirement is a block, which the parser
 reads, and that it refuses a table; development.md,
