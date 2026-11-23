@@ -24,8 +24,8 @@ runs a built executable through `CARGO_BIN_EXE_<name>`.
 
 ## What you check
 
-1. **The scenario matches its requirement.** Its steps prove the row's
-   MUST, not something easier; its tags carry the row's id, priority
+1. **The scenario matches its requirement.** Its steps prove the requirement's
+   MUST, not something easier; its tags carry the requirement's id, priority
    and traces. No scenario is retagged or put back on `@pending`.
 2. **Bindings stay thin.** A step parses its arguments and calls a library
    function that has unit tests; logic in a binding is a finding.

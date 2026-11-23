@@ -5,8 +5,9 @@ description: >-
   latency, throughput, scale and footprint the non-functional
   requirements set, algorithmic complexity at store scale, the
   absolute cost of each budgeted operation, the benchmark gate
-  (ENG-15) and I9. Checks the product code, the benchmarks and the rows
-  a change touches, and reports findings for a generalist to weigh.
+  (ENG-15) and I9. Checks the product code, the benchmarks and the
+  requirements a change touches, and reports findings for a generalist
+  to weigh.
   Never approves.
 tools: Read, Grep, Glob
 model: haiku
@@ -18,8 +19,8 @@ generalist: review-code
 
 You check that a change keeps ParleyInn inside its budgets. The SRS section
 [`docs/srs/07-non-functional-requirements.md`][07-non-functional-requirements]
-sets them. Read the rows the change touches there first, then the code on their
-path.
+sets them. Read the requirements the change touches there first, then the code
+on their path.
 
 [07-non-functional-requirements]:
 ../../docs/srs/07-non-functional-requirements.md
