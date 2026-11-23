@@ -177,6 +177,7 @@ The review's agents MUST have no credential that can approve or write.
 | 14    | sonnet | ENG-28 and ENG-32 are blocks, word for word; the gates pass                                                                                                          |
 | 15    | sonnet | A requirement table fails the parse gate; the tests pass                                                                                                             |
 | 16    | sonnet | The tools, the scenarios and the docs say requirement; the tests pass                                                                                                |
+| 17    | sonnet | The review's agents say requirement; each one's cases pass on its model                                                                                              |
 
 ## Phases
 
@@ -231,6 +232,7 @@ footer: |
 |     | ↳      | The srs crate's parser, which every gate shares, reads a requirement only as a block and refuses a requirement table with its file, its header's line and what to do. A drift case proves the parse gate catches one. No requirement changes, and no scenario comes off @pending.                                                                                                                                                                                                                                                         |
 | 16  | ✅     | [The tools, the scenarios and the docs say requirement](phase-16.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 |     | ↳      | Where the tools, the scenarios and the docs called a requirement a row, or a section's requirements a table, they say requirement or block. The evaluation's derived case of a MUST added with no change to its scenario reads the requirement as a block alone. No requirement changes, and no scenario comes off @pending.                                                                                                                                                                                                              |
+| 17  | 🔳     | [The review's agents say requirement](phase-17.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 <?/catalog?>
 
 ## Acceptance Criteria
