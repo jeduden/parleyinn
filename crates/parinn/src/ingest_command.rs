@@ -261,6 +261,7 @@ pub(crate) fn record_ingested(ctx: &Context, ingested: &ingest::Ingested, stderr
     audit_prompts(ctx, ingested, stderr);
     audit_index_gaps(ctx, ingested, stderr);
     tracing::info!(
+        target: "parinn",
         transcript = %ingested.redacted_path,
         writer = %ingested.writer,
         events = ingested.events as u64,
