@@ -19,12 +19,10 @@ use std::collections::BTreeSet;
 use ::record::event::EventKind;
 use ::record::id::Address;
 use cucumber::{then, when};
-use envelope::tokens;
 use serde_json::{Value, json};
 use store::Store;
 
 use crate::World;
-use crate::live::{self, Harness};
 use crate::record::{home, last_run, run_core};
 use crate::record_search::{Reply, arguments_of, call_tool, last_reply};
 use crate::record_transcript::{ingest, recorded};
@@ -34,25 +32,25 @@ use crate::security_redaction::{append, transcripts};
 #[derive(Debug, Default)]
 pub struct RecallSteps {
     /// The transcripts already given their lines and ingested.
-    recorded: BTreeSet<String>,
+    pub(crate) recorded: BTreeSet<String>,
     /// The tools the last listing offered.
-    tools: Vec<Value>,
+    pub(crate) tools: Vec<Value>,
     /// The tool and arguments of the last `event_expand`, `event_get` or
     /// `event_search` call a step made.
-    asked: Option<(String, Value)>,
+    pub(crate) asked: Option<(String, Value)>,
     /// The six tools' calls, by tool.
-    calls: Vec<(String, Reply)>,
+    pub(crate) calls: Vec<(String, Reply)>,
     /// How many recall events the record held before the last call.
     pub(crate) before: usize,
     /// The "recalls" stat `stat_list` gave before the first search.
-    recalls_before: Option<u64>,
+    pub(crate) recalls_before: Option<u64>,
     /// How many recall events the record held just before, and just
     /// after, that first read.
-    recall_events_around_read: (usize, usize),
+    pub(crate) recall_events_around_read: (usize, usize),
     /// The pages of an `event_expand` followed by its cursor.
-    pages: Vec<Value>,
+    pub(crate) pages: Vec<Value>,
     /// The reply text of each of those pages, as the agent receives it.
-    page_texts: Vec<String>,
+    pub(crate) page_texts: Vec<String>,
     /// What `mcp_server_get` answered, without a session binding and
     /// with one held.
     pub(crate) states: Vec<String>,
@@ -167,7 +165,7 @@ pub fn record_runs(w: &mut World) -> Result<(), String> {
 
 /// The "recalls" stat `stat_list` gives now, which the call itself
 /// leaves a recall event for.
-fn recalls_stat(w: &mut World) -> Result<u64, String> {
+pub(crate) fn recalls_stat(w: &mut World) -> Result<u64, String> {
     let answer = call_tool(w, "stat_list", json!({}))?;
     let envelope: Value = serde_json::from_str(&answer.text)
         .map_err(|e| format!("stat_list answered no envelope: {e}: {}", answer.text))?;
@@ -232,10 +230,10 @@ pub fn recall_events(w: &World) -> Result<Vec<(Address, Value)>, String> {
 
 /// The most events a store may hold for [`recall_events`] to check its
 /// query against a scan of every log.
-const SCANNED: i64 = 10_000;
+pub(crate) const SCANNED: i64 = 10_000;
 
 /// How many events the store at `path` holds.
-fn events_held(path: &std::path::Path) -> Result<i64, String> {
+pub(crate) fn events_held(path: &std::path::Path) -> Result<i64, String> {
     let flags = rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY;
     let conn = rusqlite::Connection::open_with_flags(path, flags).map_err(|e| e.to_string())?;
     conn.query_row("SELECT count(*) FROM events", [], |r| r.get(0))
@@ -244,7 +242,7 @@ fn events_held(path: &std::path::Path) -> Result<i64, String> {
 
 /// The recall events every writer's log holds, decoded, in the order of
 /// [`recall_events`].
-fn scanned_recall_events(store: &Store) -> Result<Vec<(Address, Value)>, String> {
+pub(crate) fn scanned_recall_events(store: &Store) -> Result<Vec<(Address, Value)>, String> {
     let mut out = Vec::new();
     for writer in store.writers().map_err(|e| e.to_string())? {
         for stored in store.log(writer).map_err(|e| e.to_string())? {
@@ -260,7 +258,10 @@ fn scanned_recall_events(store: &Store) -> Result<Vec<(Address, Value)>, String>
 
 /// The addresses of the events of `kind` in the store at `path`, by
 /// writer and seq.
-fn addresses_of_kind(path: &std::path::Path, kind: EventKind) -> Result<Vec<Address>, String> {
+pub(crate) fn addresses_of_kind(
+    path: &std::path::Path,
+    kind: EventKind,
+) -> Result<Vec<Address>, String> {
     let flags = rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY;
     let conn = rusqlite::Connection::open_with_flags(path, flags).map_err(|e| e.to_string())?;
     let mut statement = conn
@@ -280,7 +281,7 @@ fn addresses_of_kind(path: &std::path::Path, kind: EventKind) -> Result<Vec<Addr
 
 /// The arguments a step text names for `tool`: `range from "A" to "B"`
 /// is two addresses, the rest key and value pairs.
-fn tool_arguments(w: &mut World, text: &str) -> Result<Value, String> {
+pub(crate) fn tool_arguments(w: &mut World, text: &str) -> Result<Value, String> {
     if text == "a range above 8,000 estimated model tokens" {
         crate::record_transcript::remember_counters(w)?;
         return Ok(json!({"range": {"from": "A1:1", "to": "A1:80"}}));
@@ -314,7 +315,7 @@ fn calls_tool(w: &mut World, tool: String, args: String) -> Result<(), String> {
 }
 
 /// The envelope the last recall call answered.
-fn envelope_of(w: &mut World) -> Result<Value, String> {
+pub(crate) fn envelope_of(w: &mut World) -> Result<Value, String> {
     let answer = last_reply(w)?;
     if answer.is_error {
         return Err(format!("the recall call was refused: {}", answer.text));
@@ -324,7 +325,7 @@ fn envelope_of(w: &mut World) -> Result<Value, String> {
 }
 
 /// Fails unless `envelope` has the shape of §9.3.
-fn wrapped(envelope: &Value) -> Result<(), String> {
+pub(crate) fn wrapped(envelope: &Value) -> Result<(), String> {
     let mut names: Vec<&str> = envelope
         .as_object()
         .ok_or("the answer is no object")?
@@ -389,7 +390,7 @@ fn wrapped_in_envelope(w: &mut World) -> Result<(), String> {
 
 /// The seqs the tombstones and quarantine markers of `envelope` stand
 /// in place of.
-fn marked_seqs(envelope: &Value) -> Result<BTreeSet<u64>, String> {
+pub(crate) fn marked_seqs(envelope: &Value) -> Result<BTreeSet<u64>, String> {
     let mut out = BTreeSet::new();
     for kind in ["tombstones", "quarantine_markers"] {
         for mark in envelope[kind].as_array().into_iter().flatten() {
@@ -419,7 +420,7 @@ pub fn asked(w: &mut World, tool: &str, arguments: &Value) {
 }
 
 /// The seq an address text such as `A1:7` ends in.
-fn seq_of(text: &str) -> Result<u64, String> {
+pub(crate) fn seq_of(text: &str) -> Result<u64, String> {
     text.rsplit([':', '/'])
         .next()
         .and_then(|s| s.parse().ok())
@@ -430,7 +431,7 @@ fn seq_of(text: &str) -> Result<u64, String> {
 /// address of `event_get`, the whole range of `event_expand`, from one
 /// writer, or the first of them when the cap cut the call; a search's
 /// hits are checked by their own steps.
-fn asked_items(
+pub(crate) fn asked_items(
     tool: &str,
     arguments: &Value,
     items: &[Value],
@@ -520,7 +521,7 @@ fn carries_version_and_warning(w: &mut World) -> Result<(), String> {
 // RCL-01.
 
 /// A request line.
-fn request(id: u64, method: &str, params: &Value) -> String {
+pub(crate) fn request(id: u64, method: &str, params: &Value) -> String {
     format!(
         "{}\n",
         json!({"jsonrpc": "2.0", "id": id, "method": method, "params": params})
@@ -528,7 +529,7 @@ fn request(id: u64, method: &str, params: &Value) -> String {
 }
 
 /// The result of request `id` among what `parinn mcp` answered.
-fn answer(w: &mut World, id: u64) -> Result<Value, String> {
+pub(crate) fn answer(w: &mut World, id: u64) -> Result<Value, String> {
     let out = last_run(w)?;
     String::from_utf8_lossy(&out.stdout)
         .lines()
@@ -558,7 +559,7 @@ fn lists_tools(w: &mut World) -> Result<(), String> {
 /// The items of SRS §9.2's tool list: each tool's name, the code span
 /// leading its item, and the names its Parameters field lists outside
 /// parentheses, the field's lines joined.
-fn specified() -> Result<Vec<(String, Vec<String>)>, String> {
+pub(crate) fn specified() -> Result<Vec<(String, Vec<String>)>, String> {
     let path = testkit::repo_root().join("docs/srs/09-interfaces.md");
     let text = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
     let section = text
@@ -587,7 +588,7 @@ fn specified() -> Result<Vec<(String, Vec<String>)>, String> {
 }
 
 /// The backticked names a Parameters field lists outside parentheses.
-fn parameters_of(field: &str) -> Vec<String> {
+pub(crate) fn parameters_of(field: &str) -> Vec<String> {
     let (mut depth, mut inside, mut name) = (0usize, false, String::new());
     let mut out = Vec::new();
     for c in field.chars() {
@@ -663,7 +664,7 @@ fn tools_declare_parameters(w: &mut World) -> Result<(), String> {
 }
 
 /// The calls of RCL-01's six tools.
-fn six_calls() -> [(&'static str, Value); 6] {
+pub(crate) fn six_calls() -> [(&'static str, Value); 6] {
     [
         ("event_search", json!({"query": "deploy"})),
         ("event_expand", json!({"range": "A1:1-2"})),
@@ -745,294 +746,3 @@ fn each_recorded(w: &mut World) -> Result<(), String> {
 }
 
 // RCL-03.
-
-/// How many pages a cursor walk keeps before its server is replaced.
-const HALFWAY: usize = 20;
-
-/// Fetches every page of the `event_expand` the last step started, by
-/// its cursor, keeping each answer. The agent calls one MCP server for
-/// the whole walk, as a harness keeps one through its session: a page
-/// costs a request, not a server start. After [`HALFWAY`] pages, that server
-/// stops and a new one takes the next cursor, so a cursor that worked
-/// only on the server that issued it fails the walk. The servers serve
-/// the scope `room`, as the first call's did. Each is stopped, its
-/// trace checked (ENG-12), even when the walk fails.
-fn follow_cursor(w: &mut World) -> Result<(), String> {
-    let page = envelope_of(w)?;
-    recall(w).pages = vec![page.clone()];
-    recall(w).page_texts = vec![last_reply(w)?.text];
-    let Some(cursor) = page["next_cursor"].as_str().map(str::to_owned) else {
-        return Ok(());
-    };
-    let mut harness = live::start(w, true, &[])?;
-    let walked = walk(w, &mut harness, cursor, HALFWAY);
-    let stopped = harness.stop();
-    let Some(cursor) = walked? else {
-        return stopped;
-    };
-    stopped?;
-    let mut harness = live::start(w, true, &[])?;
-    let walked = walk(w, &mut harness, cursor, usize::MAX);
-    let stopped = harness.stop();
-    walked?;
-    stopped
-}
-
-/// Follows `cursor` on `harness`'s MCP server, keeping each page, until
-/// the pages kept reach `until` or the walk ends; the cursor left to
-/// follow, none at the end.
-fn walk(
-    w: &mut World,
-    harness: &mut Harness,
-    mut cursor: String,
-    until: usize,
-) -> Result<Option<String>, String> {
-    loop {
-        let arguments = json!({"cursor": cursor, "scope": "room"});
-        let text = page_text(harness, arguments)?;
-        let page: Value = serde_json::from_str(&text)
-            .map_err(|e| format!("event_expand answered no envelope: {e}: {text}"))?;
-        recall(w).pages.push(page.clone());
-        recall(w).page_texts.push(text);
-        if recall(w).pages.len() > 400 {
-            return Err("the cursor never ends".to_owned());
-        }
-        match page["next_cursor"].as_str() {
-            None => return Ok(None),
-            Some(next) if recall(w).pages.len() >= until => return Ok(Some(next.to_owned())),
-            Some(next) => cursor = next.to_owned(),
-        }
-    }
-}
-
-/// The text `event_expand` answers `arguments` with on `harness`'s MCP
-/// server; a refusal fails.
-fn page_text(harness: &mut Harness, arguments: Value) -> Result<String, String> {
-    let params = json!({"name": "event_expand", "arguments": arguments});
-    let reply = harness.request("tools/call", params)?;
-    let result = &reply["result"];
-    let text = result["content"][0]["text"].as_str().unwrap_or_default();
-    if result["isError"] == true {
-        return Err(format!("event_expand refused the cursor: {text}"));
-    }
-    Ok(text.to_owned())
-}
-
-#[then(
-    regex = r"^the items carry the exact post-redaction content with payload references resolved$"
-)]
-fn exact_content(w: &mut World) -> Result<(), String> {
-    let envelope = envelope_of(w)?;
-    let store = Store::open(&home(w)?.store()).map_err(|e| e.to_string())?;
-    let mut resolved = 0;
-    let items = envelope["items"].as_array().cloned().unwrap_or_default();
-    if items.is_empty() {
-        return Err("the envelope holds no item".to_owned());
-    }
-    for item in &items {
-        let cut = item["continuation"]
-            .as_array()
-            .is_some_and(|f| f.iter().any(|f| f == "cut"));
-        if item["flags"].as_array().is_some_and(|f| !f.is_empty()) {
-            return Err(format!(
-                "{} carries flags: {}",
-                item["address"], item["flags"]
-            ));
-        }
-        let address = Address::parse(item["address"].as_str().unwrap_or_default())
-            .map_err(|e| e.to_string())?
-            .0;
-        let stored = store.event(address).map_err(|e| e.to_string())?;
-        let kept = stored
-            .as_ref()
-            .and_then(|s| s.content.as_ref())
-            .and_then(|c| c["text"].as_str())
-            .ok_or_else(|| format!("{address} holds no text"))?;
-        let shown = item["content"].as_str().unwrap_or_default();
-        if stored.as_ref().is_some_and(|s| s.payload.is_some()) {
-            resolved += 1;
-        }
-        let exact = if cut {
-            kept.starts_with(shown)
-        } else {
-            kept == shown
-        };
-        if !exact {
-            return Err(format!(
-                "{address} shows other content than the record holds"
-            ));
-        }
-    }
-    if resolved == 0 {
-        let seen: Vec<String> = items
-            .iter()
-            .map(|i| {
-                format!(
-                    "{}:{}",
-                    i["address"]
-                        .as_str()
-                        .unwrap_or_default()
-                        .rsplit('/')
-                        .next()
-                        .unwrap_or_default(),
-                    i["content"].as_str().map_or(0, str::len)
-                )
-            })
-            .collect();
-        return Err(format!("no item of the range was a payload: {seen:?}"));
-    }
-    Ok(())
-}
-
-#[then(
-    regex = r#"^the envelope is at most 8,000 estimated model tokens with "truncated" true and a "next_cursor"$"#
-)]
-fn at_most_the_cap(w: &mut World) -> Result<(), String> {
-    let answer = last_reply(w)?;
-    let envelope = envelope_of(w)?;
-    let spent = tokens::estimate(&answer.text);
-    if spent > 8_000 {
-        return Err(format!("the envelope is {spent} estimated model tokens"));
-    }
-    if envelope["truncated"] != true || !envelope["next_cursor"].is_string() {
-        return Err("the envelope is neither truncated nor continued by a cursor".to_owned());
-    }
-    Ok(())
-}
-
-#[then(
-    regex = r#"^calling "event_expand" with that cursor returns the following events without gap or overlap$"#
-)]
-fn cursor_continues(w: &mut World) -> Result<(), String> {
-    follow_cursor(w)?;
-    let store = Store::open(&home(w)?.store()).map_err(|e| e.to_string())?;
-    let pages = recall(w).pages.clone();
-    for (n, text) in recall(w).page_texts.iter().enumerate() {
-        let spent = tokens::estimate(text);
-        if spent > 8_000 {
-            return Err(format!("page {n} is {spent} estimated model tokens"));
-        }
-    }
-    // Each event in order, a cut one made whole again from its pieces.
-    let mut events: Vec<(String, String)> = Vec::new();
-    for item in pages
-        .iter()
-        .flat_map(|p| p["items"].as_array().cloned().unwrap_or_default())
-    {
-        let address = item["address"].as_str().unwrap_or_default().to_owned();
-        let content = item["content"].as_str().unwrap_or_default();
-        let continued = item["continuation"]
-            .as_array()
-            .is_some_and(|f| f.iter().any(|f| f == "continued"));
-        match events.last_mut() {
-            Some((last, text)) if continued && *last == address => text.push_str(content),
-            _ => events.push((address, content.to_owned())),
-        }
-    }
-    let first = Address::parse(&events[0].0).map_err(|e| e.to_string())?.0;
-    let mut want = 0;
-    for (n, (address, text)) in events.iter().enumerate() {
-        let parsed = Address::parse(address).map_err(|e| e.to_string())?.0;
-        want = first.seq.get() + n as u64;
-        if parsed.writer != first.writer || parsed.seq.get() != want {
-            return Err(format!(
-                "event {n} is {address}, wanting seq {want}: a gap or an overlap"
-            ));
-        }
-        let kept = store.event(parsed).map_err(|e| e.to_string())?;
-        let kept = kept
-            .as_ref()
-            .and_then(|s| s.content.as_ref())
-            .and_then(|c| c["text"].as_str());
-        if kept != Some(text.as_str()) {
-            return Err(format!(
-                "{address} came back other than the record holds it"
-            ));
-        }
-    }
-    if events.len() < 400 || want != first.seq.get() + events.len() as u64 - 1 {
-        return Err(format!(
-            "the pages cover {} events, wanting 400",
-            events.len()
-        ));
-    }
-    Ok(())
-}
-
-// RCL-07.
-
-#[then(
-    regex = r#"^the record gains one recall event with provenance "assistant" carrying the query$"#
-)]
-fn gains_one_recall_event(w: &mut World) -> Result<(), String> {
-    let before = recall(w).before;
-    let events = recall_events(w)?;
-    if events.len() != before + 1 {
-        return Err(format!(
-            "the record held {before} recall events and now holds {}",
-            events.len()
-        ));
-    }
-    let (address, content) = events.last().ok_or("no recall event")?.clone();
-    let store = Store::open(&home(w)?.store()).map_err(|e| e.to_string())?;
-    let stored = store
-        .event(address)
-        .map_err(|e| e.to_string())?
-        .ok_or("event gone")?;
-    if stored.link.header.provenance.name() != "assistant" {
-        return Err(format!(
-            "its provenance is {}",
-            stored.link.header.provenance.name()
-        ));
-    }
-    if content["tool"] != "event_search" || content["arguments"]["query"] != "deploy" {
-        return Err(format!("the recall event carries {content}"));
-    }
-    Ok(())
-}
-
-#[then(regex = r"^that event lists the addresses of the returned events$")]
-fn lists_addresses(w: &mut World) -> Result<(), String> {
-    let (_, content) = recall_events(w)?.last().ok_or("no recall event")?.clone();
-    let envelope = envelope_of(w)?;
-    let returned: Vec<&str> = envelope["items"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .filter_map(|i| i["address"].as_str())
-        .collect();
-    let listed: Vec<&str> = content["returned"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .filter_map(Value::as_str)
-        .collect();
-    if returned.is_empty() || returned != listed {
-        return Err(format!(
-            "the call returned {returned:?}, the event lists {listed:?}"
-        ));
-    }
-    Ok(())
-}
-
-#[then(regex = r#"^the stat "recalls" increases by 1$"#)]
-fn recalls_stat_increases(w: &mut World) -> Result<(), String> {
-    let before = recall(w)
-        .recalls_before
-        .ok_or("no step read the recalls stat before the call")?;
-    let (held, left) = recall(w).recall_events_around_read;
-    // Reading the stat leaves a recall event of its own, which the
-    // later read counts beside the search. The record, not the stat,
-    // says how many of each there were; the second read comes after
-    // both are counted, so it is the stat's own answer to compare.
-    let searched = recall_events(w)?.len().saturating_sub(left);
-    let after = recalls_stat(w)?;
-    let want = before + (left - held) as u64 + searched as u64;
-    if searched == 1 && after == want {
-        return Ok(());
-    }
-    Err(format!(
-        "the search left {searched} recall events; stat_list gave {before} recalls before it \
-         and {after} after, wanting {want}"
-    ))
-}
