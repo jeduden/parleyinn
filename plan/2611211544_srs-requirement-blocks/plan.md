@@ -88,7 +88,8 @@ requirement at 50 lines, through mdsmith's `max-section-length` on
 the srs kind, with those six listed at their length until each is
 split; phase 1 lands it. ENG-28's entry is 193, its length with the
 clause #161 adds, since its section is rewritten only after #161
-lands.
+lands. #154's two sentences take it to 202, which the stakeholder
+listed on 26 November 2026.
 
 The shape. The srs crate reads a block line by line, and mdsmith
 reads it as Markdown. On 22 November 2026 the stakeholder asked that
