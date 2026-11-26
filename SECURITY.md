@@ -12,9 +12,8 @@ untrusted content to the model, isolation per principal, and no network
 in the core with every other component inside its declared boundary
 (test:
 `the_core_executable_links_only_crates_its_reach_allows`). A way to break
-one is a vulnerability. See
-[docs/srs/06-security.md](docs/srs/06-security.md) for the threat
-model.
+one is a vulnerability. See the
+[threat model](docs/srs/06a-threat-model.md).
 
 ## Reporting a vulnerability
 
