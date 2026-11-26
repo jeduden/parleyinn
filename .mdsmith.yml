@@ -90,12 +90,12 @@ kinds:
       # A requirement written under its own heading may hold 50 lines,
       # from its heading to the next: the stakeholder's ruling of 22
       # November 2026. The six longer ones are listed at their length,
-      # ENG-28's with the clause #161 adds, and each leaves the list as
-      # it is split (plan 2611211544).
+      # ENG-28's with the clauses #161 and plan 2611261842 add, and each
+      # leaves the list as it is split (plan 2611211544).
       max-section-length:
         per-heading:
           - pattern: "^ENG-28$"
-            max: 193
+            max: 195
           - pattern: "^PRV-12$"
             max: 135
           - pattern: "^PRV-08$"

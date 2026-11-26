@@ -8,6 +8,7 @@ mod ci;
 mod ci_gates;
 mod context;
 mod file_sizes;
+mod merged_head;
 mod previous;
 mod records;
 mod release;
@@ -189,6 +190,7 @@ fn late_cases() -> Vec<Case> {
         coverage_list_cases(),
         tool_list_cases(),
         table_parse_cases(),
+        merged_head::review_merged_head_cases(),
     ]
     .concat()
 }
