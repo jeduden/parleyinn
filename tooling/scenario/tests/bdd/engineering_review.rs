@@ -43,7 +43,7 @@ fn agents_run_by(w: &mut World, cmd: String) -> Result<(), String> {
 }
 
 #[then(
-    regex = r"^that job and the evaluation's job check the head out with its history and merge it into main before the review bundle, the evaluation plan or the cases read it, as the local review does, none reads the head alone, and review-run is told the head, not the merge$"
+    regex = r"^that job and the evaluation's job check the head out with its history and have git merge it into main before the review bundle, the evaluation plan or the cases read it, as the local review does, none reads the head alone, and review-run is told the head, not git's merge of it$"
 )]
 fn review_merges_the_head(w: &mut World) -> Result<(), String> {
     outcome(engineering::review_merge::wiring_problems(
@@ -52,7 +52,7 @@ fn review_merges_the_head(w: &mut World) -> Result<(), String> {
 }
 
 #[then(
-    regex = r"^the merge reads only the branch's own change of a branch that merged main and another pull request apart, once main merged that one, of a branch behind main and of a head that holds main, which it leaves as it is, and refuses a head that does not merge with main, naming the file that conflicts$"
+    regex = r"^git's merge of the head reads only the branch's own change of a branch that merged main and another pull request apart, once main merged that one, of a branch behind main and of a head that holds main, which it leaves as it is, and refuses a head that does not merge with main, naming the file that conflicts$"
 )]
 fn merge_reads_own_change(w: &mut World) -> Result<(), String> {
     let work = testkit::TempDir::new().map_err(|e| format!("make a work directory: {e}"))?;
