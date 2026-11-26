@@ -1,7 +1,7 @@
 ---
 id: 2611261842
 title: "The review reads a pull request as landing it would leave main"
-status: "🔳"
+status: "✅"
 summary: >-
   The review, its evaluation and the local review read a pull request's
   head merged into main, never the head alone, so a stacked or
@@ -67,19 +67,34 @@ comes off `@pending`.
    does not merge fails, naming the files that conflict.
 3. The review job runs it in place of the three-dot diff, the
    evaluation's job before its cases from a checkout with history, and
-   `scripts/review-local.sh` once it has added its two worktrees.
+   `scripts/review-local.sh` once it has added its two worktrees. Since
+   `pr-head` then holds the merge, the review job tells review-run the
+   head, as the local review does, so a comment's review still reuses
+   the verdict of the same head.
 4. ENG-28 says the review reads the head merged into main and does not
    run on a head that does not merge; `.mdsmith.yml` lists ENG-28 at its
    new length. Each step's check lands with a drift case.
 5. [docs/ci.md](../docs/ci.md) says what the review reads.
 
+## Outcome
+
+Phase 14 was replayed against a main that merged phase 16, #182's head.
+Read alone, it diffs 52 files from the first of two merge bases and
+dispatches 17 agents. Merged into main, it diffs its own 5 files and
+dispatches 5. Against a main that then merged phase 17, the head alone
+plans 42 components and 141 cases, about 11.88 USD; merged, it plans
+none. ENG-28's scenario passes with its two new steps, which the
+cucumber runner runs on four histories. The drift suite catches each
+of the six new cases, among the 33 that inject a file the change
+touches.
+
 ## Acceptance Criteria
 
-- [ ] A branch that merged main and another pull request apart is
+- [x] A branch that merged main and another pull request apart is
       reviewed on its own change alone
-- [ ] A branch behind main plans no reviewer component it does not
+- [x] A branch behind main plans no reviewer component it does not
       change
-- [ ] A head that does not merge with main is not reviewed, and the run
+- [x] A head that does not merge with main is not reviewed, and the run
       names the files that conflict
-- [ ] ENG-28's scenario passes with both steps, and a drift case fails
+- [x] ENG-28's scenario passes with both steps, and a drift case fails
       each
