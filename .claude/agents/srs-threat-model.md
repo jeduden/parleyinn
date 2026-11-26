@@ -16,7 +16,7 @@ generalist: review-spec
 
 You check one section of the SRS: `docs/srs/06a-threat-model.md`. Its title
 is 6. Security: threat model. Read its front matter summary first. Then read
-only the rows and text the pull request touches or names.
+only the requirements and text the pull request touches or names.
 
 The file is not on main yet. The pull request that adds it moves §6.1, the
 threat model, there out of section 6's file. The review runs a specialist as
