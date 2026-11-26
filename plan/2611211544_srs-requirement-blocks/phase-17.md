@@ -25,6 +25,14 @@ scenario to its requirement as the context quotes it, performance reads
 the requirements a change touches, and test-engineer-end-to-end proves
 the requirement's MUST.
 
+The threat model's specialist. #179 landed `srs-threat-model` ahead of
+its section, and #178 put 06a on main. It takes this phase's text with
+the other SRS specialists, and the final text phase 13 left to a later
+pull request: it links its section as `srs-boundary-register` does,
+and the paragraph saying the file is not on main yet goes. Its own
+cases still bring a file of their own, which the review bundle hands it
+by the file's name, as `srs-review-requirements`' cases do.
+
 RED. None: no case can fail first. A slip fails no run, and no case
 plants an id a specialist should be unsure of. Main's cases are the
 gate, each run on its component's model, beside the same cases run on
