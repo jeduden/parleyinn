@@ -3,8 +3,8 @@
 use std::fs;
 use std::path::Path;
 
-/// One requirement table.
-pub const SRS: &str = "# 5\n\n| ID | Pri | Requirement | Ver | Traces |\n|---|---|---|---|---|\n| REC-01 | P0 | Ingest. | T | I1 |\n| ENG-11 | P0 | Coverage for security-sensitive crates (`pin`). | A | I1 |\n| ENG-29 | P0 | Invariants and PRV-10 need an ADR. | I | I2 |\n";
+/// Three requirements, each a block.
+pub const SRS: &str = "# 5\n\n## REC-01\n\n- Pri: P0\n- Ver: T\n- Traces: I1\n\nIngest.\n\n## ENG-11\n\n- Pri: P0\n- Ver: A\n- Traces: I1\n\nCoverage for security-sensitive crates (`pin`).\n\n## ENG-29\n\n- Pri: P0\n- Ver: I\n- Traces: I2\n\nInvariants and PRV-10 need an ADR.\n";
 
 /// One live scenario and one pending.
 pub const FEATURES: &str = "Feature: Record\n\n  @REC-01 @P0 @I1\n  Scenario: ingest\n    Given a transcript\n\n  @ENG-29 @P0 @I2 @pending\n  Scenario: guarded\n    Given nothing\n";

@@ -500,6 +500,22 @@ pub(super) fn block_parse_cases() -> Vec<Case> {
     )]
 }
 
+/// The drift the parse gate catches when a requirement goes back to a
+/// table's row: a requirement table in a new section fails the gate,
+/// which reads a requirement only as a block.
+pub(super) fn table_parse_cases() -> Vec<Case> {
+    vec![case(
+        "a requirement written as a table's row",
+        "specification_parses",
+        Injection::create(
+            "docs/srs/10b-drift.md",
+            "# Drift\n\n| ID | Pri | Requirement | Ver |\n| --- | --- | --- | --- |\n| ENG-99 | P1 | A row. | T |\n",
+        ),
+        cargo_test("srs", "gates", "specification_parses"),
+        "10b-drift.md:3: a requirement table",
+    )]
+}
+
 /// A requirement written as a block before the heading of §10.4: its
 /// heading, its two fields and 45 lines of text, 51 lines with the
 /// blank line after them, one past the cap.

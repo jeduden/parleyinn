@@ -5,9 +5,7 @@ const ROW_TEXT: &str = "MUST flag: 1000 for Rust (`.rs`), 500 for Gherkin (`.fea
                         shell (`.sh`); a file for review is no limit.";
 
 fn srs_with(text: &str) -> String {
-    format!(
-        "# 10\n\n| ID | Pri | Requirement | Ver |\n|---|---|---|---|\n| ENG-34 | P0 | {text} | T |\n"
-    )
+    format!("# 10\n\n## ENG-34\n\n- Pri: P0\n- Ver: T\n\n{text}\n")
 }
 
 fn nit(path: &str, body: &str) -> Nit {
@@ -160,9 +158,8 @@ fn build_names_a_diff_it_could_not_write() {
 #[test]
 fn build_names_a_review_bundle_that_failed() {
     let work = testkit::TempDir::new().unwrap();
-    // A second row REC-01 the pull request's tree does not read.
-    let twice =
-        "| ID | Pri | Requirement | Ver |\n|---|---|---|---|\n| REC-01 | P0 | Again. | T |\n";
+    // A second REC-01 the pull request's tree does not read.
+    let twice = "# X\n\n## REC-01\n\n- Pri: P0\n- Ver: T\n\nAgain.\n";
 
     let err = build(work.path(), &[("docs/srs/x.md", twice.to_owned())]);
 
@@ -170,7 +167,7 @@ fn build_names_a_review_bundle_that_failed() {
     assert_eq!(
         err.unwrap_err(),
         format!(
-            "review-bundle: srs: {}:3: REC-01 already defined at {}:5 (the pull request's tree)\n",
+            "review-bundle: srs: {}:3: REC-01 already defined at {}:3 (the pull request's tree)\n",
             head.join("x.md").display(),
             head.join("05.md").display()
         )
