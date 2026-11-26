@@ -33,12 +33,12 @@ pub const UNREAD: &str = "LICENSE";
 /// What separates a finding's path from its consequence.
 const FORM: &str = " — if not addressed: ";
 
-/// The fixture tree's requirement table, scenarios and invariants: the
-/// least the review bundle reads.
+/// The fixture tree's requirement, scenarios and invariants: the least
+/// the review bundle reads.
 const TREE: [(&str, &str); 3] = [
     (
         "docs/srs/05.md",
-        "# 5\n\n| ID | Pri | Requirement | Ver | Traces |\n|---|---|---|---|---|\n| REC-01 | P0 | Ingest. | T | I1 |\n",
+        "# 5\n\n## REC-01\n\n- Pri: P0\n- Ver: T\n- Traces: I1\n\nIngest.\n",
     ),
     (
         "features/record.feature",

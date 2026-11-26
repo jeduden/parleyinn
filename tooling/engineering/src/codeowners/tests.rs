@@ -3,9 +3,12 @@ use super::*;
 const INDEX: &str = "| **Stakeholder** | @boss, also the security reviewer |\n";
 
 const ENG: &str = "\
-| ID | Pri | Requirement | Ver |
-|---|---|---|---|
-| ENG-21 | P0 | Only a change to what guides the review needs the stakeholder: the agent instructions, the review's code, cases and scorecard, CI and the merge rules (`CODEOWNERS` itself among them), the manifests and tool pins CI builds and checks with, the bans and acceptances CI holds the code to and the linter configuration (`.mdsmith.yml`). | I |
+## ENG-21
+
+- Pri: P0
+- Ver: I
+
+Only a change to what guides the review needs the stakeholder: the agent instructions, the review's code, cases and scorecard, CI and the merge rules (`CODEOWNERS` itself among them), the manifests and tool pins CI builds and checks with, the bans and acceptances CI holds the code to and the linter configuration (`.mdsmith.yml`).
 ";
 
 const OWNERS: &str = "\

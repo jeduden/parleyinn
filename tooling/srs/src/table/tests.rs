@@ -13,6 +13,7 @@ fn tables_reads_header_and_rows_with_lines() {
 
     assert_eq!(got.len(), 1);
     assert_eq!(got[0].header, ["A", "B"]);
+    assert_eq!(got[0].line, 3);
     assert_eq!(got[0].rows, [row(&["1", "2"], 5), row(&["3", "4"], 6)]);
 }
 
