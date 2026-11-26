@@ -918,8 +918,8 @@ fn refused_at_full_context_window(w: &mut World, refusal: String) -> Result<(), 
     })
 }
 
-/// What ASM-09's recordings showed, as the OQ-01 row must say it, and
-/// the finding each phrase records.
+/// What ASM-09's recordings showed, as OQ-01 must say it, and the
+/// finding each phrase records.
 const S6_FINDINGS: [(&str, &str); 2] = [
     (
         "blocks a manual compaction and every automatic one (ASM-09)",
@@ -931,19 +931,19 @@ const S6_FINDINGS: [(&str, &str); 2] = [
     ),
 ];
 
-#[then(regex = r"^the OQ-01 row of SRS §13 records what ASM-09's recordings showed$")]
+#[then(regex = r"^OQ-01 in SRS §13 records what ASM-09's recordings showed$")]
 fn oq_01_records_s6(_w: &mut World) -> Result<(), String> {
     let path = testkit::repo_root().join("docs/srs/13-open-questions-and-risks.md");
     let body = fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
-    let row = body
-        .lines()
-        .find(|l| l.starts_with("| OQ-01 "))
-        .ok_or("SRS §13 holds no OQ-01 row")?;
+    // OQ-01's list item, its lines joined by single spaces as Markdown reads them.
+    let words = body.split_whitespace().collect::<Vec<_>>().join(" ");
+    let item = words.split("- **OQ-").find(|i| i.starts_with("01**: "));
+    let item = item.ok_or("SRS §13 holds no OQ-01")?;
     outcome(
         S6_FINDINGS
             .iter()
-            .filter(|(said, _)| !row.contains(said))
-            .map(|(_, finding)| format!("the OQ-01 row does not record that {finding}"))
+            .filter(|(said, _)| !item.contains(said))
+            .map(|(_, finding)| format!("OQ-01 does not record that {finding}"))
             .collect(),
     )
 }

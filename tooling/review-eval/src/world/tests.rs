@@ -19,7 +19,7 @@ pub(crate) fn repository(root: &Path) {
     };
     write(
         "docs/srs/05.md",
-        "# 5\n\n| ID | Pri | Requirement | Ver | Traces |\n|---|---|---|---|---|\n| REC-01 | P0 | Ingest. | T | I1 |\n| ENG-11 | P0 | Coverage for security-sensitive crates (`pin`). | A | I1 |\n",
+        "# 5\n\n## REC-01\n\n- Pri: P0\n- Ver: T\n- Traces: I1\n\nIngest.\n\n## ENG-11\n\n- Pri: P0\n- Ver: A\n- Traces: I1\n\nCoverage for security-sensitive crates (`pin`).\n",
     );
     write("docs/srs/invariants.md", "# 1.3 Invariants\n\nI1 holds.\n");
     write("docs/domain-model/index.md", "# hub\n");

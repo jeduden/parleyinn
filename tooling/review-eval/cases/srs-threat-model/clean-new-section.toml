@@ -1,0 +1,33 @@
+# A case applies to main's tree, and the section this specialist checks
+# is not there before the pull request that adds it. So each case here
+# brings a file of its own and applies before that pull request and
+# after it. The review bundle knows a section's specialist by the file's
+# name without its number, so it hands this file to the same specialist.
+# These cases hold the specialist to a section's file that is new; the
+# cases derived from the section hold it to a change of the section.
+# The file has a title and a case a name of its own, so neither meets
+# the section's or a derived case's once the section is on main.
+component = "srs-threat-model"
+kind = "clean"
+title = "the section's file with a title and a true sentence"
+
+[[create]]
+file = "docs/srs/06c-threat-model.md"
+content = '''
+---
+title: "Threat model notes"
+summary: >-
+  Notes on the threat model, which hold no threat yet.
+---
+# Threat model notes
+
+This file is part of ParleyInn.
+'''
+
+[expect]
+outcome = ["none", "findings"]
+main_unread = true
+
+[[expect.none]]
+path = "docs/srs/06c-threat-model.md"
+form = "linked"

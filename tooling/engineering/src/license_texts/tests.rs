@@ -633,10 +633,8 @@ fn problems_split_into_missing_files_and_texts_that_do_not_fit() {
 #[cfg(unix)]
 #[test]
 fn cargo_metadata_for_never_lets_cargo_fetch() {
-    use std::os::unix::fs::PermissionsExt;
-    let (dir, _) = checkout(&[("cargo", "#!/bin/sh\necho \"$@\" > \"$0.args\"\nexit 1\n")]);
-    let fake = dir.path().join("cargo");
-    fs::set_permissions(&fake, fs::Permissions::from_mode(0o755)).unwrap();
+    let dir = testkit::TempDir::new().unwrap();
+    let fake = crate::tests::script(dir.path(), "cargo", "echo \"$@\" > \"$0.args\"\nexit 1");
 
     let err =
         cargo_metadata_for(fake.as_os_str(), Path::new("Cargo.toml"), dir.path(), "t").unwrap_err();
@@ -722,10 +720,8 @@ fn product_links_check_names_a_product_crate_that_depends_on_the_check() {
 
 #[cfg(unix)]
 fn script(body: &str) -> (testkit::TempDir, std::process::Child) {
-    use std::os::unix::fs::PermissionsExt;
-    let (dir, _) = checkout(&[("run.sh", body)]);
-    let path = dir.path().join("run.sh");
-    fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
+    let dir = testkit::TempDir::new().unwrap();
+    let path = crate::tests::script(dir.path(), "run.sh", body);
     let child = Command::new(&path)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -738,7 +734,7 @@ fn script(body: &str) -> (testkit::TempDir, std::process::Child) {
 #[cfg(unix)]
 #[test]
 fn finish_within_collects_the_output_of_a_child_that_finishes() {
-    let (_dir, child) = script("#!/bin/sh\necho out\necho err >&2\nexit 3\n");
+    let (_dir, child) = script("echo out\necho err >&2\nexit 3");
 
     let out = finish_within(child, Duration::from_secs(30)).unwrap();
 
@@ -752,7 +748,7 @@ fn finish_within_collects_the_output_of_a_child_that_finishes() {
 #[cfg(unix)]
 #[test]
 fn finish_within_kills_a_child_still_running_at_the_deadline() {
-    let (_dir, child) = script("#!/bin/sh\nsleep 30\n");
+    let (_dir, child) = script("sleep 30");
 
     let err = finish_within(child, Duration::from_millis(100)).unwrap_err();
 

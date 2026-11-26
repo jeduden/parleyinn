@@ -16,13 +16,12 @@
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::OnceLock;
 
 use ::record::event::{EventKind, Provenance};
 use ::record::id::{Address, Seq, WriterId};
 use audit::log::Log;
 use cucumber::{given, then, when};
-use harness_contract::{recording, shapes};
+use harness_contract::shapes;
 use serde_json::{Value, json};
 use store::{Store, Stored};
 
@@ -37,8 +36,7 @@ use crate::security_redaction::{append, transcript};
 pub const API_KEY: &str = "sk-ant-api03-Abcdefghijklmnopqrstuvwxyz0123456789";
 /// An AWS access key, as AWS documents an example one.
 pub const AWS_ACCESS_KEY: &str = "AKIAIOSFODNN7EXAMPLE";
-/// The recorded Claude Code version the shapes are generated from.
-pub const VERSION: &str = "2.1.296";
+pub use testkit::transcript::{VERSION, recorded, recorded_call};
 
 /// What the transcript steps track: the counters before the scenario's
 /// first ingest, the raw lines a step appended, and the event the last
@@ -53,70 +51,6 @@ pub struct TranscriptSteps {
 
 fn steps(w: &mut World) -> &mut TranscriptSteps {
     w.section::<TranscriptSteps>()
-}
-
-/// Every line the recordings of [`VERSION`] hold, by transcript.
-///
-/// The recordings are checked-in test data no step writes, so the run
-/// parses them once, on first use, and every step reads that one parse:
-/// a fixture of a hundred lines no longer parses megabytes of JSON per
-/// line. A failed parse is kept too, and fails every step that asks.
-fn recorded_transcripts() -> Result<&'static [Vec<Value>], String> {
-    static PARSED: OnceLock<Result<Vec<Vec<Value>>, String>> = OnceLock::new();
-    PARSED
-        .get_or_init(|| {
-            let version = testkit::repo_root()
-                .join("testdata/claude-code")
-                .join(VERSION);
-            shapes::transcripts(&version)?
-                .iter()
-                .map(|path| recording::lines(path))
-                .collect()
-        })
-        .as_deref()
-        .map_err(Clone::clone)
-}
-
-/// The first recorded line `pick` accepts.
-pub fn recorded(what: &str, pick: impl Fn(&Value) -> bool) -> Result<Value, String> {
-    recorded_transcripts()?
-        .iter()
-        .flatten()
-        .find(|line| pick(line))
-        .cloned()
-        .ok_or_else(|| format!("no recorded line is {what}"))
-}
-
-/// A recorded assistant line calling `tool`, and the line holding its
-/// result, from one transcript.
-pub fn recorded_call(tool: &str) -> Result<(Value, Value), String> {
-    for lines in recorded_transcripts()? {
-        for call in lines {
-            let Some(id) = tool_use_id(call, tool) else {
-                continue;
-            };
-            let result = lines.iter().find(|l| {
-                l["message"]["content"][0]["tool_use_id"].as_str() == Some(id.as_str())
-                    && l["message"]["content"].as_array().map(Vec::len) == Some(1)
-            });
-            if let Some(result) = result {
-                return Ok((call.clone(), result.clone()));
-            }
-        }
-    }
-    Err(format!(
-        "no recording holds a call of {tool} with its result"
-    ))
-}
-
-/// The id of the call of `tool` the assistant line `line` makes.
-fn tool_use_id(line: &Value, tool: &str) -> Option<String> {
-    let block = &line["message"]["content"][0];
-    (line["type"] == "assistant"
-        && block["type"] == "tool_use"
-        && block["name"].as_str().is_some_and(|n| n.starts_with(tool)))
-    .then(|| block["id"].as_str().map(str::to_owned))
-    .flatten()
 }
 
 /// The counts of every counter the audit log holds now.

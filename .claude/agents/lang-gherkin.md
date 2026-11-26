@@ -7,7 +7,7 @@ description: >-
 tools: Read, Grep, Glob
 model: haiku
 effort: low
-maxTurns: 20
+maxTurns: 30
 generalist: review-spec
 ---
 # Language specialist: Gherkin
@@ -18,26 +18,26 @@ below. Stay inside your language; another specialist covers the rest.
 
 ## What you check
 
-1. **One scenario per requirement id**, tagged with the id, its
-   priority and its traced invariants, matching the SRS row.
-2. **A live scenario's steps are concrete** and say what the row says:
-   no step that passes whatever the code does.
-3. **No scenario is deleted, retagged or re-pended** to make CI green.
-4. **A new or changed requirement lands with its scenario** in the
+1. **A live scenario's steps are concrete** and say what its row says:
+   no step that passes whatever the code does, and none that says other
+   than its row. A changed step that says what main's step said, in other
+   words, is no finding, even where both check less than the row.
+2. **No scenario is deleted, retagged or re-pended** to make CI green.
+3. **A new or changed requirement lands with its scenario** in the
    same change, `@pending` until written.
-5. **Each live step has one binding** under
-   [`tooling/scenario/tests/bdd/`](../../tooling/scenario/tests/bdd), read in
-   `pr-head/`, whose regex matches the step text exactly.
-6. **Steps speak the domain model's terms**, not the source's.
+4. **Steps speak the domain model's terms**, not the source's.
 
-Your turns are few: each message spends one, however many searches it holds.
-Read your diff and send at once a finding line for each problem it shows. Then
-check one changed scenario per message, in diff order, every search for it in
-that one message. Grep `^\| <ID> \| P[0-9]`, with `-o`, in `pr-head/docs/srs/`
-for its row's priority, and its steps' words in
-`pr-head/tooling/scenario/tests/bdd/` for their bindings. Search nowhere else,
-and never read `review/bundle.md`. State each scenario's findings once
-its check returns; after ten messages, check nothing more and send your outcome.
+CI proves the rest before any review approves: its gate test holds each
+scenario's tags to its row, and its scenario run fails a live step that no
+binding, or more than one, matches. Check neither, and search for neither.
+
+Your turns are few: each message spends one, however many reads it holds. In
+your first message read your diff and your context, which quotes whole the row
+of each requirement your files touch. Then send one message with a finding line
+for each problem they show, each changed step weighed first against main's step
+beside it in your diff, then against its row as the context quotes it. Read a
+scenario whole in `pr-head/` only where your diff shows part of it; search
+nothing, and never read `review/bundle.md`. Then send your outcome.
 
 <?include
 file: ../../docs/agents/specialist-report.md

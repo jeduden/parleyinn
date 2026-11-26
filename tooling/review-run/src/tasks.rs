@@ -308,8 +308,7 @@ fn one(r: &Review, c: &Controls, unit: &Unit, heard: &Answers) -> Done {
         run.ignored = read.ignored;
         run.unreadable = read.unreadable;
         run.partial.extend(
-            reading::uncovered(r.workdir, &unit.stem(), &log.reads)
-                .map(|why| (Some(part.index), why)),
+            reading::uncovered(r.workdir, &unit.stem(), log).map(|why| (Some(part.index), why)),
         );
         if read.stated_nothing {
             let why = crate::run::cut_why(log).unwrap_or_default();

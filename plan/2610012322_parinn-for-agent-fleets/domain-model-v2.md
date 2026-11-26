@@ -503,7 +503,7 @@ for them.
 [513]:
   ../../docs/srs/05c-principal-and-peer-requirements.md#513-principal-acts-own
 [53]: ../../docs/srs/05f-pins-recall-and-restore-requirements.md#53-pins-pin
-[61]: ../../docs/srs/06-security.md#61-threat-model
+[61]: ../../docs/srs/06a-threat-model.md#61-threat-model
 [62]: ../../docs/srs/06-security.md#62-security-requirements-sec
 [d1]: #d1-owner-is-a-room-relation
 [d10]: #d10-foreign-room-means-no-seat-held

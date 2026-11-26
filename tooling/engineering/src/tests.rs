@@ -13,6 +13,32 @@ pub(crate) fn checkout(files: &[(&str, &str)]) -> (testkit::TempDir, Checkout) {
     (dir, checkout)
 }
 
+/// An executable shell script `name` in `dir`, holding `body`, that
+/// has started once and can start again.
+///
+/// A fork another test thread makes can hold the new file open for
+/// writing until it execs, and starting the script meanwhile fails with
+/// "text file busy". The script exits at once when asked to `--warm`
+/// up, and is started that way until the start succeeds.
+#[cfg(unix)]
+pub(crate) fn script(dir: &Path, name: &str, body: &str) -> PathBuf {
+    use std::os::unix::fs::PermissionsExt;
+
+    let path = dir.join(name);
+    let text = format!("#!/bin/sh\n[ \"$1\" = --warm ] && exit 0\n{body}\n");
+    fs::write(&path, text).unwrap();
+    fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
+    for _ in 0..500 {
+        match std::process::Command::new(&path).arg("--warm").status() {
+            Err(e) if e.kind() == std::io::ErrorKind::ExecutableFileBusy => {
+                std::thread::sleep(std::time::Duration::from_millis(10));
+            }
+            _ => break,
+        }
+    }
+    path
+}
+
 #[test]
 fn contains_names_the_file_and_the_text() {
     let (_dir, c) = checkout(&[(".github/workflows/release.yml", "cargo build --locked\n")]);
@@ -34,9 +60,9 @@ fn contains_names_the_file_and_the_text() {
 }
 
 #[test]
-fn requirement_reads_one_row_or_says_what_is_missing() {
-    let row = "| ID | Pri | Requirement | Ver |\n|---|---|---|---|\n| ENG-18 | P0 | Text. | I |\n";
-    let (_dir, c) = checkout(&[("docs/srs/10.md", row)]);
+fn requirement_reads_one_or_says_what_is_missing() {
+    let block = "## ENG-18\n\n- Pri: P0\n- Ver: I\n\nText.\n";
+    let (_dir, c) = checkout(&[("docs/srs/10.md", block)]);
 
     assert_eq!(c.requirement("ENG-18").unwrap().text, "Text.");
     assert_eq!(
@@ -52,7 +78,7 @@ fn requirement_reads_one_row_or_says_what_is_missing() {
         broken
             .requirement("ENG-18")
             .unwrap_err()
-            .contains("malformed requirement id")
+            .contains("a requirement table")
     );
 }
 

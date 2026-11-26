@@ -1,10 +1,12 @@
 //! Pipe tables read from a Markdown document, and the code fences
 //! that hide a table quoted inside them.
 
-/// One pipe table: its header cells and its body rows.
+/// One pipe table: its header cells, the line its header sits on, and
+/// its body rows.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Table {
     pub header: Vec<String>,
+    pub line: usize,
     pub rows: Vec<Row>,
 }
 
@@ -32,16 +34,14 @@ pub fn tables(body: &str) -> Vec<Table> {
             i += 1;
             continue;
         }
-        if fence.is_some()
-            || !is_pipe_row(trimmed)
-            || !lines.get(i + 1).is_some_and(|next| is_delimiter_row(next))
-        {
+        if fence.is_some() || !opens_table(trimmed, lines.get(i + 1).copied()) {
             i += 1;
             continue;
         }
 
         let mut table = Table {
             header: split_row(trimmed),
+            line: i + 1,
             rows: Vec::new(),
         };
         i += 2;
@@ -82,6 +82,12 @@ pub fn fence_after<'a>(open: Option<&'a str>, line: &'a str) -> Option<&'a str> 
         }
         (open, Some(_)) => open,
     }
+}
+
+/// Whether `line`, with `next` under it, opens a table: a pipe row with
+/// a delimiter row under it.
+pub(crate) fn opens_table(line: &str, next: Option<&str>) -> bool {
+    is_pipe_row(line.trim()) && next.is_some_and(is_delimiter_row)
 }
 
 fn is_pipe_row(line: &str) -> bool {

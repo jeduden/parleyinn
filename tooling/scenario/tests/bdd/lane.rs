@@ -19,7 +19,7 @@ use cucumber::{given, then, when};
 use serde_json::{Value, json};
 
 use crate::World;
-use crate::live::Harness;
+use crate::live;
 use crate::record::{home, last_run, run_core, run_core_at_terminal, set_env};
 
 /// What the repository steps track: the clone, and the identity git
@@ -125,7 +125,7 @@ fn first_hook_event(w: &mut World, dir: &Path, session: &str) -> Result<(), Stri
         "source": "startup",
     });
     let before = looks_done(w)?;
-    let mut harness = Harness::start(w, false, &[])?;
+    let mut harness = live::start(w, false, &[])?;
     harness.hook("SessionStart", &input)?;
     harness.start_mcp()?;
     // The server holds the binding once it has taken it, and says so.

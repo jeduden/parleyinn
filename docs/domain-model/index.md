@@ -117,7 +117,7 @@ errors and logs use the model's words.
 | --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
 | session                                                                           | It belongs to the harness; ParleyInn speaks of runs.                                                        | As "harness session", or inside a harness's own names, such as `SessionStart`, `session_id` and `allow-session`.             |
 | project                                                                           | A room names branches in repositories; nothing is scoped to a project.                                      | The harness's `~/.claude/projects` path, the harness settings scope `--scope project`, and ParleyInn's own software project. |
-| compaction guidance                                                               | Withdrawn by the stakeholder (OQ-51): ParleyInn sends the harness nothing for a compaction.                 | Nowhere else.                                                                                                                |
+| compaction guidance                                                               | Withdrawn by the stakeholder (OQ-51): ParleyInn sends the harness nothing for a compaction.                 | Only in OQ-02's and OQ-51's record of its withdrawal.                                                                        |
 | tenant                                                                            | Replaced by principal.                                                                                      | Nowhere else.                                                                                                                |
 | operator, as a role or a person                                                   | The role is moderator; the person running a node is the node's principal.                                   | Only as the `operator` provenance class.                                                                                     |
 | owner act, owner key, owner surface                                               | Replaced by principal act, principal key and principal surface.                                             | Nowhere else.                                                                                                                |
@@ -155,8 +155,9 @@ The review's tooling words are engineering-tooling words too, described in
   `review/context/<specialist>.md` that the review bundle writes for one
   specialist, holding the review class (light, standard or deep), the ids the
   change touches, the dispatch row that names the specialist, the
-  deterministic findings on its files and the ENG-29 record a guarded
-  change lands with.
+  deterministic findings on its files, the ENG-29 record a guarded
+  change lands with, and each touched requirement its files change or
+  name, quoted whole.
 - **Stability measurement**: reviews of the same pull-request snapshots,
   repeated to measure how stable the review is.
 - **Flip rate, finding overlap**: how stable the review is: the share of a
@@ -193,7 +194,7 @@ Build and packaging words have no ParleyInn meaning: crate, lockfile, release
 build, executable and release target. They are engineering-tooling words.
 Requirements may use them in their ordinary sense wherever they name a
 built artifact, as ADM-01 does with "core executable" and the `licenses`
-row of the command-line section does.
+entry of the command-line section does.
 
 ## Changing the model
 

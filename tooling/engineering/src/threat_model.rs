@@ -13,7 +13,7 @@ use crate::{Checkout, privacy};
 pub const MODEL: &str = "docs/security/threat-model.md";
 
 /// Where §6.1 lists the threat sources.
-const SECURITY: &str = "docs/srs/06-security.md";
+const SECURITY: &str = "docs/srs/06a-threat-model.md";
 
 /// The manifest whose version names the current release.
 const VERSION_MANIFEST: &str = "crates/parinn/Cargo.toml";

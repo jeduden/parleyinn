@@ -20,8 +20,8 @@ fn read(name: &str) -> String {
     fs::read_to_string(srs_dir().join(name)).unwrap()
 }
 
-/// Every requirement table under docs/srs reads cleanly, and every id
-/// is unique across the whole document.
+/// Every requirement under docs/srs reads cleanly, none written as a
+/// table's row, and every id is unique across the whole document.
 #[test]
 fn specification_parses() {
     let reqs = srs::load(&srs_dir()).unwrap();
@@ -29,11 +29,11 @@ fn specification_parses() {
     assert_eq!(
         reqs.len(),
         239 + 15 + 34 + 22,
-        "§5–§6, NFR, ENG and ASM rows"
+        "§5–§6, NFR, ENG and ASM requirements"
     );
 }
 
-/// Appendix B says it is generated from the Traces column of §5–§6, so
+/// Appendix B says it is generated from the Traces of §5–§6, so
 /// an edit to a trace that forgets the appendix, or the other way
 /// round, fails here.
 #[test]
@@ -46,7 +46,7 @@ fn appendix_b_matches_the_traces() {
     let mut problems = Vec::new();
     if stated.len() != 10 {
         problems.push(format!(
-            "Appendix B has rows for {:?}, want every invariant I1–I10",
+            "Appendix B has items for {:?}, want every invariant I1–I10",
             stated.keys()
         ));
     }
@@ -60,7 +60,7 @@ fn appendix_b_matches_the_traces() {
         let (want, got) = (sorted(&traced), sorted(&stated));
         if want != got {
             problems.push(format!(
-                "Appendix B row {invariant} lists {got:?}, the traces give {want:?}"
+                "Appendix B lists {got:?} for {invariant}, the traces give {want:?}"
             ));
         }
     }

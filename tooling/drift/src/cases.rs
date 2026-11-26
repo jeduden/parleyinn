@@ -180,7 +180,15 @@ fn late_cases() -> Vec<Case> {
         eng_29_row_cases(),
         review_logs::review_reading_cases(),
         context::review_consent_cases(),
+        context::review_quote_cases(),
         review_tree_place_cases(),
+        block_parse_cases(),
+        block_length_cases(),
+        block_shape_cases(),
+        line_length_cases(),
+        coverage_list_cases(),
+        tool_list_cases(),
+        table_parse_cases(),
     ]
     .concat()
 }

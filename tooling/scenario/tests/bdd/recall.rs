@@ -24,10 +24,10 @@ use serde_json::{Value, json};
 use store::Store;
 
 use crate::World;
-use crate::live::Harness;
+use crate::live::{self, Harness};
 use crate::record::{home, last_run, run_core};
 use crate::record_search::{Reply, arguments_of, call_tool, last_reply};
-use crate::record_transcript::{ingest, recorded, recorded_call};
+use crate::record_transcript::{ingest, recorded};
 use crate::security_redaction::{append, transcripts};
 
 /// What the recall steps track.
@@ -62,27 +62,8 @@ pub fn recall(w: &mut World) -> &mut RecallSteps {
     w.section::<RecallSteps>()
 }
 
-/// A `uuid` for fixture line `n`.
-fn uuid(n: u64) -> String {
-    format!("00000000-0000-4000-8000-{n:012x}")
-}
-
-/// A Bash call and its result, numbered `n`, the result's output
-/// `output`, each line with a `uuid` of its own.
-pub(crate) fn pair(n: u64, output: &str) -> Result<Vec<Value>, String> {
-    let (mut call, mut result) = recorded_call("Bash")?;
-    let id = format!("toolu_fixture{n}");
-    call["message"]["content"][0]["id"] = json!(id);
-    call["uuid"] = json!(uuid(2 * n));
-    result["message"]["content"][0]["tool_use_id"] = json!(id);
-    result["message"]["content"][0]["content"] = json!(output);
-    result["uuid"] = json!(uuid(2 * n + 1));
-    if result["toolUseResult"].is_object() {
-        result["toolUseResult"]["stdout"] = json!(output);
-    }
-
-    Ok(vec![call, result])
-}
+pub(crate) use testkit::transcript::pair;
+use testkit::transcript::uuid;
 
 /// The lines the fixture run `name` holds.
 pub fn fixture(name: &str) -> Result<Vec<Value>, String> {
@@ -574,47 +555,42 @@ fn lists_tools(w: &mut World) -> Result<(), String> {
     Ok(())
 }
 
-/// The rows of SRS §9.2's tool table: each tool's name and the names
-/// its parameters cell lists outside parentheses.
+/// The items of SRS §9.2's tool list: each tool's name, the code span
+/// leading its item, and the names its Parameters field lists outside
+/// parentheses, the field's lines joined.
 fn specified() -> Result<Vec<(String, Vec<String>)>, String> {
     let path = testkit::repo_root().join("docs/srs/09-interfaces.md");
     let text = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
-    let mut rows = Vec::new();
-    for line in text.lines().filter(|l| l.starts_with("| `")) {
-        let cells = cells_of(line);
-        let name = cells.first().map(|c| c.trim().trim_matches('`').to_owned());
-        if let (Some(name), Some(params)) = (name, cells.get(2)) {
-            rows.push((name, parameters_of(params)));
+    let section = text
+        .split("\n## ")
+        .find(|s| s.starts_with("9.2 "))
+        .ok_or("SRS section 9.2 is missing")?;
+    let mut tools: Vec<(String, String)> = Vec::new();
+    let mut in_field = false;
+    for line in section.lines() {
+        if let Some(lead) = line.strip_prefix("- `") {
+            let name = lead.split('`').next().unwrap_or_default();
+            tools.push((name.to_owned(), String::new()));
+        }
+        let first = line.strip_prefix("  - Parameters: ");
+        in_field = first.is_some() || (in_field && line.starts_with("    "));
+        if let (true, Some((_, field))) = (in_field, tools.last_mut()) {
+            field.push(' ');
+            field.push_str(first.unwrap_or(line).trim());
         }
     }
 
-    Ok(rows)
+    Ok(tools
+        .into_iter()
+        .map(|(name, field)| (name, parameters_of(&field)))
+        .collect())
 }
 
-/// The cells of a Markdown table row, an escaped pipe kept in its cell.
-fn cells_of(line: &str) -> Vec<String> {
-    let mut cells = vec![String::new()];
-    let mut escaped = false;
-    for c in line.trim().trim_start_matches('|').chars() {
-        match (c, escaped) {
-            ('|', false) => cells.push(String::new()),
-            (c, _) => {
-                if let Some(cell) = cells.last_mut() {
-                    cell.push(c);
-                }
-                escaped = c == '\\' && !escaped;
-            }
-        }
-    }
-    cells.pop();
-    cells
-}
-
-/// The backticked names a parameters cell lists outside parentheses.
-fn parameters_of(cell: &str) -> Vec<String> {
+/// The backticked names a Parameters field lists outside parentheses.
+fn parameters_of(field: &str) -> Vec<String> {
     let (mut depth, mut inside, mut name) = (0usize, false, String::new());
     let mut out = Vec::new();
-    for c in cell.chars() {
+    for c in field.chars() {
         match c {
             '`' if inside => {
                 let plain = name.chars().all(|c| c.is_ascii_lowercase() || c == '_');
@@ -788,14 +764,14 @@ fn follow_cursor(w: &mut World) -> Result<(), String> {
     let Some(cursor) = page["next_cursor"].as_str().map(str::to_owned) else {
         return Ok(());
     };
-    let mut harness = Harness::start(w, true, &[])?;
+    let mut harness = live::start(w, true, &[])?;
     let walked = walk(w, &mut harness, cursor, HALFWAY);
     let stopped = harness.stop();
     let Some(cursor) = walked? else {
         return stopped;
     };
     stopped?;
-    let mut harness = Harness::start(w, true, &[])?;
+    let mut harness = live::start(w, true, &[])?;
     let walked = walk(w, &mut harness, cursor, usize::MAX);
     let stopped = harness.stop();
     walked?;

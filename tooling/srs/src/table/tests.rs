@@ -13,6 +13,7 @@ fn tables_reads_header_and_rows_with_lines() {
 
     assert_eq!(got.len(), 1);
     assert_eq!(got[0].header, ["A", "B"]);
+    assert_eq!(got[0].line, 3);
     assert_eq!(got[0].rows, [row(&["1", "2"], 5), row(&["3", "4"], 6)]);
 }
 
@@ -64,6 +65,14 @@ fn fence_after_opens_and_closes_on_its_own_marker() {
     assert_eq!(fence_after(Some("```"), "````"), None);
     assert_eq!(fence_after(Some("````"), "```"), Some("````"));
     assert_eq!(fence_after(Some("```"), "~~~"), Some("```"));
+}
+
+#[test]
+fn opens_table_wants_a_pipe_row_with_a_delimiter_row_under_it() {
+    assert!(opens_table("  | A |", Some("|---|")));
+    assert!(!opens_table("| A |", Some("| B |")));
+    assert!(!opens_table("| A |", None));
+    assert!(!opens_table("A |", Some("|---|")));
 }
 
 #[test]
