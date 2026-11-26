@@ -21,10 +21,16 @@ vector and controls fields under it, wrapped at 80 columns. §6 keeps
 §6.2, and a sentence where §6.1 stood points at 06a and 06b; its
 summary says so. No other line of §6 changes.
 
-The specialist. `srs-threat-model` checks 06a as `srs-boundary-register`
-checks 06b, its text the same but for the file and its title. Its
-evaluation cases derive from the section, as every section
-specialist's do.
+The specialist. The review runs a specialist as main defines it, and
+the evaluation builds a case's world from main's tree. So
+`srs-threat-model` lands in a pull request of its own before the
+section, as the review section's specialist did (#146, #147). Its text
+is `srs-boundary-register`'s but for the file and its title, and it
+says its file is not on main yet. Its three cases bring a file of their
+own, `docs/srs/06c-threat-model.md`, which the review bundle hands it
+too. The section's pull request leaves the specialist as main has it.
+Once 06a is on main, a third pull request gives the specialist its
+final text, and the cases derived from the section join its three.
 
 The readers. The threat model gate (SEC-17) reads §6.1's threat sources
 from 06a, and its drift case's message names 06a. The finding
@@ -32,8 +38,10 @@ ledger's three quotes from §6.1 name 06a, where its check finds them.
 `SECURITY.md`, the threat model page and an older plan's link point at
 06a.
 
-Consent. CODEOWNERS names `.claude/agents`, so the pull request asks
-once for the stakeholder's consent.
+Consent. CODEOWNERS names `.claude/agents` and `tooling/review-eval`.
+The specialist's pull request asks for the stakeholder's consent to
+both, and the third one to `.claude/agents`. The section's pull
+request changes neither.
 
 Gate. Each of these is recorded in the handoff:
 
@@ -43,6 +51,8 @@ Gate. Each of these is recorded in the handoff:
   and the sentence pointing at 06a;
 - the srs gates, the scenario gate, the workspace's tests and the ENG
   scenarios pass, and `review-eval check` counts the new specialist;
+- the evaluation, run as the review workflow runs it against main's
+  checkout, passes the specialist's three cases;
 - the drift suite catches the cases that inject the threat model page
   and §6;
 - `scripts/review-local.sh` approves.

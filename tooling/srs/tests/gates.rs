@@ -20,8 +20,8 @@ fn read(name: &str) -> String {
     fs::read_to_string(srs_dir().join(name)).unwrap()
 }
 
-/// Every requirement table under docs/srs reads cleanly, and every id
-/// is unique across the whole document.
+/// Every requirement under docs/srs reads cleanly, none written as a
+/// table's row, and every id is unique across the whole document.
 #[test]
 fn specification_parses() {
     let reqs = srs::load(&srs_dir()).unwrap();
@@ -29,7 +29,7 @@ fn specification_parses() {
     assert_eq!(
         reqs.len(),
         239 + 15 + 34 + 22,
-        "§5–§6, NFR, ENG and ASM rows"
+        "§5–§6, NFR, ENG and ASM requirements"
     );
 }
 

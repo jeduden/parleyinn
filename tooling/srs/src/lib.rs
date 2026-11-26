@@ -1,6 +1,7 @@
 //! Reads the requirements of the Software Requirements Specification
-//! under `docs/srs`, its tables' rows and its blocks, so the test suite
-//! can hold the specification and the executable scenarios in step. It is
+//! under `docs/srs`, each a block under a heading that is its id, so the
+//! test suite can hold the specification and the executable scenarios in
+//! step, and refuses a requirement written as a table's row. It is
 //! repository tooling for the gates in the `scenario` crate and never
 //! links into a shipped executable.
 
@@ -27,11 +28,10 @@ pub const FAMILIES: [&str; 18] = [
     "PEER", "SEC", "NFR", "ENG", "ASM",
 ];
 
-/// One requirement: a row of a requirement or assumption table, or a
-/// block under a heading that is its id. `priority` and `traces` are
-/// empty when it has no such column or field: the non-functional
-/// requirements and the assumptions carry neither, the engineering
-/// requirements no Traces. `line` is the row's, or the heading's.
+/// One requirement: a block under a heading that is its id.
+/// `priority` and `traces` are empty when it has no such field: the
+/// non-functional requirements and the assumptions carry neither, the
+/// engineering requirements no Traces. `line` is its heading's.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Requirement {
     pub id: String,
@@ -50,7 +50,8 @@ pub enum Error {
     List { dir: PathBuf, source: io::Error },
     /// A file could not be read.
     Read { path: PathBuf, source: io::Error },
-    /// A table is malformed, or an id defined twice.
+    /// A requirement is malformed or written as a table's row, or an
+    /// id defined twice.
     Malformed(String),
 }
 
@@ -97,12 +98,12 @@ fn numbered_once(s: &str, prefix: char) -> bool {
 }
 
 /// Reads every requirement from the Markdown files directly in `dir`,
-/// in file-name order, and reports an id two rows share.
+/// in file-name order, and reports an id two requirements share.
 ///
 /// # Errors
 ///
-/// Fails when `dir` or a file in it cannot be read, a table is
-/// malformed, or two rows share an id.
+/// Fails when `dir` or a file in it cannot be read, a requirement is
+/// malformed or written as a table's row, or two share an id.
 pub fn load(dir: &Path) -> Result<Vec<Requirement>, Error> {
     let mut all = Vec::new();
     let mut seen: BTreeMap<String, (PathBuf, usize)> = BTreeMap::new();
@@ -147,40 +148,46 @@ fn markdown_files(dir: &Path) -> Result<Vec<PathBuf>, Error> {
     Ok(paths)
 }
 
-/// Reads the requirements from one document, in its order. A
-/// requirement table is one whose header leads with "ID" and names a
-/// "Requirement" or an "Assumption" column; every other table
-/// (constraints, open questions, glossaries) is passed by. Within a
-/// requirement table every row must lead with a well-formed id and
-/// trace only real invariants, or the row is reported with its line. A
-/// block, a heading that is a requirement id, must carry fields of
-/// [`FIELDS`], each once, and a text, or it is reported with its line.
+/// Reads the requirements from one document, in its order. Each is a
+/// block, a heading that is a requirement id, which must carry fields
+/// of [`FIELDS`], each once, and a text, or it is reported with its
+/// line. A requirement table, one whose header leads with "ID" and
+/// names a "Requirement" or an "Assumption" column, is refused with its
+/// header's line: a requirement is written as a block. Every other
+/// table (constraints, open questions, glossaries) is passed by.
 ///
 /// # Errors
 ///
-/// Fails on the first malformed row or block.
+/// Fails on a requirement table, or on the first malformed block.
 pub fn parse(path: &Path, body: &str) -> Result<Vec<Requirement>, Error> {
-    let mut out = Vec::new();
-    for table in tables(body) {
-        let cols = columns(&table.header);
-        let is_requirements = cols.contains_key("Requirement") || cols.contains_key("Assumption");
-        if table.header.first().map(String::as_str) != Some("ID") || !is_requirements {
-            continue;
-        }
-        for row in &table.rows {
-            out.push(requirement_of(path, row, &cols)?);
-        }
+    if let Some(table) = tables(body)
+        .into_iter()
+        .find(|t| is_requirement_table(&t.header))
+    {
+        return Err(Error::Malformed(format!(
+            "{}:{}: a requirement table: write each requirement as a block under a heading that is its id",
+            path.display(),
+            table.line
+        )));
     }
-    for block in blocks(body) {
-        out.push(requirement_of_block(path, &block)?);
-    }
-    out.sort_by_key(|r| r.line);
 
-    Ok(out)
+    blocks(body)
+        .iter()
+        .map(|block| requirement_of_block(path, block))
+        .collect()
 }
 
-/// The labels a block's fields may carry: the columns of the
-/// requirement and assumption tables beside the id and the text.
+/// Whether `header` is a requirement table's: it leads with "ID" and
+/// names a "Requirement" or an "Assumption" column.
+fn is_requirement_table(header: &[String]) -> bool {
+    header.first().is_some_and(|h| h == "ID")
+        && header
+            .iter()
+            .any(|h| h == "Requirement" || h == "Assumption")
+}
+
+/// The labels a block's fields may carry beside its id and its text:
+/// what the requirement tables held as columns.
 pub const FIELDS: [&str; 7] = [
     "Pri",
     "Ver",
@@ -234,50 +241,7 @@ fn requirement_of_block(path: &Path, block: &Block) -> Result<Requirement, Error
     })
 }
 
-/// Maps each header name to its index.
-fn columns(header: &[String]) -> BTreeMap<&str, usize> {
-    header
-        .iter()
-        .enumerate()
-        .map(|(i, h)| (h.as_str(), i))
-        .collect()
-}
-
-/// Reads one table row.
-fn requirement_of(
-    path: &Path,
-    row: &Row,
-    cols: &BTreeMap<&str, usize>,
-) -> Result<Requirement, Error> {
-    let cell = |name: &str| {
-        cols.get(name)
-            .and_then(|i| row.cells.get(*i))
-            .cloned()
-            .unwrap_or_default()
-    };
-    let at = format!("{}:{}", path.display(), row.line);
-
-    let id = cell("ID");
-    if !is_requirement_id(&id) {
-        return Err(Error::Malformed(format!(
-            "{at}: malformed requirement id {id:?}"
-        )));
-    }
-    let traces =
-        parse_traces(&cell("Traces")).map_err(|e| Error::Malformed(format!("{at}: {id}: {e}")))?;
-
-    Ok(Requirement {
-        priority: cell("Pri"),
-        verify: cell("Ver"),
-        traces,
-        text: cell("Requirement") + &cell("Assumption"),
-        path: path.to_path_buf(),
-        line: row.line,
-        id,
-    })
-}
-
-/// Reads a Traces cell: "—" or empty for none, else a comma-separated
+/// Reads a Traces field: "—" or empty for none, else a comma-separated
 /// list of invariants.
 fn parse_traces(cell: &str) -> Result<Vec<String>, String> {
     if cell.is_empty() || cell == "—" {
