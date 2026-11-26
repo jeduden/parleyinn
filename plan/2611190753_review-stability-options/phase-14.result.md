@@ -41,13 +41,18 @@ summary: >-
 - The one failed run of the last read main's `features/` for SEC-28's
   scenario. srs-boundary-register and srs-peer-requirements, the two
   whose runs did so, then passed 6 of 6 under the gate's rule.
-- The workspace's 4,651 tests, clippy denying warnings, rustfmt,
-  `review-eval check` (236 cases, 74 components), `mdsmith check .`
-  and the cucumber scenarios `@ENG-21`, `@ENG-27`, `@ENG-28` and
-  `@ENG-32` pass: 4 scenarios, 63 steps.
-- `scripts/review-local.sh` against phase 16 of plan 2611211544: the
-  agents approve, 5 of 5 consulted, 0.35 USD. It blocks only on the
-  consent `tooling/review-eval/` needs. Its evaluation plans no
+- Merged with phase 16 and main, srs-security, whose section lost the
+  threat model, passes its 3 cases in 6 of 6 runs, none asking for a
+  change.
+- Merged with phase 16 and main, from a clean build: the workspace's
+  4,651 tests, clippy denying warnings, rustfmt, the srs and scenario
+  gates, `review-eval check` (242 cases, 75 components),
+  `mdsmith check .` and the cucumber scenarios `@ENG-21`, `@ENG-27`,
+  `@ENG-28`, `@ENG-32` and `@ENG-34` pass: 5 scenarios, 77 steps. No
+  drift case injects a file the change touches.
+- `scripts/review-local.sh` against phase 16 merged with main: the
+  agents approve, 5 of 5 consulted, no finding, 0.30 USD. It blocks
+  only on the consent `tooling/review-eval/` needs. Its evaluation plans no
   component: main's derived cases judge a pull request, so the runs
   above are this one's proof, and the weekly run takes the new MUST
   once it merges.
