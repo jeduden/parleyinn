@@ -106,11 +106,9 @@ jobs:
           path: pr-head
           fetch-depth: 0
           persist-credentials: false
-      - name: Write the pull request's diff against main
+      - name: Merge the head into main, as landing it would leave main
         if: steps.pull_head.outputs.number != ''
-        env:
-          HEAD_SHA: ${{ steps.pull_head.outputs.head_sha }}
-        run: git -C pr-head diff "origin/main...$HEAD_SHA" > pr.diff
+        run: scripts/review-merge-head.sh
       # A change to a CODEOWNERS path needs the stakeholder's consent
       # (ENG-21), in a comment or review on the pull request: only what an
       # owner in main's CODEOWNERS wrote is kept, never a comment ending
@@ -220,12 +218,13 @@ jobs:
         id: review
         if: steps.pull_head.outputs.number != '' && steps.verdict.outputs.reused != 'true'
         env:
+          HEAD_SHA: ${{ steps.pull_head.outputs.head_sha }}
           PREVIOUS: ${{ steps.previous.outputs.file }}
           SPENT: ${{ steps.spend.outputs.spent }}
         run: |
           cargo run --locked --quiet --offline -p review-run -- --workdir . --parallel 32 \
             --credential "$RUNNER_TEMP/claude-credential" --spent-before "$SPENT" \
-            ${PREVIOUS:+--previous "$PREVIOUS"} > review/run.txt
+            --head-sha "$HEAD_SHA" ${PREVIOUS:+--previous "$PREVIOUS"} > review/run.txt
       # Whatever review-run wrote is scrubbed of the token once more, a
       # run cut off before its own scrub included, before any step reads
       # or uploads it; a form found fails the job. Then the credential goes.
@@ -337,15 +336,18 @@ jobs:
       - name: Record that no component changed
         if: steps.plan.outputs.empty == 'true'
         run: scripts/review-eval-none.sh
-      # The pull request's tree holds the components and cases under
-      # evaluation, read as data: the harness runs each component inside
-      # a world of its own, never from this directory.
+      # The head merged into main holds the components and cases under
+      # evaluation, as data: the harness runs each in a world of its own.
       - if: steps.plan.outputs.empty == 'false'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.review.outputs.head_sha }}
           path: pr-head
+          fetch-depth: 0
           persist-credentials: false
+      - name: Merge the head into main, as the review read it
+        if: steps.plan.outputs.empty == 'false'
+        run: scripts/review-merge-head.sh
       - name: Install pinned Rust and mdsmith with mise
         if: steps.plan.outputs.empty == 'false'
         uses: ./.github/actions/setup-mise
