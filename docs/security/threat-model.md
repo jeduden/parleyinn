@@ -10,8 +10,8 @@ summary: >-
 
 This is the threat model SEC-17 asks for. It reads the
 [boundary register](../srs/06b-boundary-register.md) row by row, names the
-threat sources of [§6.1](../srs/06-security.md) that act across each row, and
-points at the controls that hold. The assets, the threats T1 to T29 and the
+threat sources of [§6.1](../srs/06a-threat-model.md) that act across each row,
+and points at the controls that hold. The assets, the threats T1 to T29 and the
 residual risks stay in §6.1. A check reads this page against the register and
 §6.1 (`the_threat_model_covers_the_register_and_compares_with_zed_delta`), so
 a register row or a threat source added there fails it until it is covered

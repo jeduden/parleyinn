@@ -1,7 +1,7 @@
 ---
 n: 13
 title: "§6's threat model in its own file"
-status: "🔳"
+status: "✅"
 result: false
 ---
 # Phase 13: §6's threat model in its own file

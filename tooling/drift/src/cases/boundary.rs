@@ -161,7 +161,7 @@ pub(super) fn threat_model_cases() -> Vec<Case> {
                 "| S9  | Web page in a browser ",
             ),
             gate(THREATS),
-            "differ from those of docs/srs/06-security.md",
+            "differ from those of docs/srs/06a-threat-model.md",
         ),
         case(
             "a register row whose sources the threat model leaves empty",

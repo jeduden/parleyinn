@@ -34,11 +34,11 @@
           "quote": "refuse unless its standard input and output are a terminal, except for the facilitator's program (SEC-32); an agent's tool call MUST act only from its run seat"
         },
         {
-          "file": "docs/srs/06-security.md",
+          "file": "docs/srs/06a-threat-model.md",
           "quote": "The agent confirms widening acts, or takes its principal's device seat's room acts, at a terminal, by design (OWN-12)"
         },
         {
-          "file": "docs/srs/06-security.md",
+          "file": "docs/srs/06a-threat-model.md",
           "quote": "**For principal acts and a device seat's room acts only**, under the residual risks below"
         }
       ],
@@ -368,7 +368,7 @@
           "quote": "An agent on that node can act through its CLI as the program does: §6.1's residual risk R7, which only a sandbox removes."
         },
         {
-          "file": "docs/srs/06-security.md",
+          "file": "docs/srs/06a-threat-model.md",
           "quote": "on a facilitator's node, it takes the facilitator's acts through that node's CLI as the program does (SEC-32)"
         }
       ]
