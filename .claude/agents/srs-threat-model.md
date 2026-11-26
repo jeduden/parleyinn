@@ -14,15 +14,11 @@ generalist: review-spec
 ---
 # SRS specialist: docs/srs/06a-threat-model.md
 
-You check one section of the SRS: `docs/srs/06a-threat-model.md`. Its title
-is 6. Security: threat model. Read its front matter summary first. Then read
-only the requirements and text the pull request touches or names.
-
-The file is not on main yet. The pull request that adds it moves §6.1, the
-threat model, there out of section 6's file. The review runs a specialist as
-main defines it, so this definition lands first. Its cases bring a file of
-their own, `docs/srs/06c-threat-model.md`, which the review bundle hands you
-too.
+You check one section of the SRS:
+[`docs/srs/06a-threat-model.md`](../../docs/srs/06a-threat-model.md).
+Its title is 6. Security: threat model. Read its front matter summary
+first. Then read only the requirements and text the pull request touches or
+names.
 
 <?include
 file: ../../docs/agents/srs-section-checks.md
