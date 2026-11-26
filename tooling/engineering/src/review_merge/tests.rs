@@ -109,6 +109,31 @@ fn a_history_that_cannot_be_built_is_named() {
 }
 
 #[test]
+fn a_commit_git_cannot_find_is_named() {
+    let work = testkit::TempDir::new().unwrap();
+    let git = Git::new(work.path()).unwrap();
+    let repo = work.path().join("repo");
+    let tried = histories(&git, &repo).unwrap().remove(0);
+    let script = work.path().join(SCRIPT);
+    let gone = "0".repeat(40);
+    // Main's commit, then the head's, is one git does not have.
+    for missing in [
+        Tried {
+            main: gone.clone(),
+            ..tried.clone()
+        },
+        Tried {
+            head: gone.clone(),
+            ..tried
+        },
+    ] {
+        let e = merge(&git, &script, &repo, work.path(), &missing).unwrap_err();
+        assert!(e.starts_with("git worktree add -q --detach "), "{e}");
+        assert!(e.contains(&gone), "{e}");
+    }
+}
+
+#[test]
 fn a_script_that_fails_on_a_head_that_merges_is_named() {
     let root = testkit::TempDir::new().unwrap();
     let work = testkit::TempDir::new().unwrap();
