@@ -18,10 +18,12 @@ summary: >-
   writes a signed purge receipt the node's principal can collect. It is
   P0, verified by test, and traces I1 and I6. SEC-31 keeps its other
   sentences in 49 lines.
-- SEC-31's scenario no longer names the receipt in its title or steps.
-  SEC-33's `@pending` scenario purges an event that a harness transcript
-  file, an exported bundle, an unreachable backup and a refusing peer
-  also hold, and its receipt names each copy.
+- SEC-31's scenario no longer names the receipt in its title, and a
+  step checks what SEC-31 still asks of it: a purge that times out
+  names each residue there. SEC-33's `@pending` scenario purges an
+  event that a harness transcript file, an exported bundle, an
+  unreachable backup, a refusing peer and an unreachable one also hold,
+  and its receipt names each copy.
 - `parinn purge-receipt check` in the command-line interface and the
   domain model's Receipt entry cite SEC-33, and §6's summary names
   SEC-01..33.
@@ -44,3 +46,7 @@ summary: >-
   list. PRV-08 and PRV-12 need the decision record ENG-29 asks for.
 - An evaluation case plants ENG-36 as a requirement no section
   defines, so ENG-28's split takes ids past it.
+- SEC-19 and the boundary register's opening say a purge receipt
+  carries only digests, though SEC-31 already had it name its scope,
+  ranges and copies. SEC-19 changes only with the record ENG-29 asks
+  for, so its wording waits for the PRV-08 and PRV-12 split's.
