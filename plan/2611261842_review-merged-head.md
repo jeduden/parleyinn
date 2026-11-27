@@ -51,7 +51,7 @@ them.
 
 Requirements. ENG-21, which has main move only through reviewed pull
 requests, gains the sentence; its scenario gains two steps, the
-workflow's wiring and the merge on four histories. ENG-21 holds 30
+workflow's wiring and the merge on four histories. ENG-21 holds 32
 lines, under the srs kind's 50. ENG-28, the review gate, already holds
 more, so it and `.mdsmith.yml` stay as they are. No scenario comes off
 `@pending`.
@@ -75,8 +75,8 @@ more, so it and `.mdsmith.yml` stay as they are. No scenario comes off
    head, as the local review does, so a comment's review still reuses
    the verdict of the same head.
 4. ENG-21 says the review reads the head merged into main and does not
-   run on a head that does not merge. Each step's check lands with a
-   drift case.
+   run on a head that does not merge, but names the files that
+   conflict. Each step's check lands with a drift case.
 5. [docs/ci.md](../docs/ci.md) says what the review reads.
 
 ## Outcome

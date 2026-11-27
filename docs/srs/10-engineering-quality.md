@@ -365,7 +365,9 @@ Main's protection MUST also require on every pull request the review gate's
 check (ENG-28), taken from the reviewer GitHub App alone, so no other reviewer's
 approval stands in for the agent's.
 The review MUST read the head as git merges it into main, as landing it would
-leave main, and MUST NOT run on a head that git cannot merge with main.
+leave main.
+It MUST NOT run on a head that git cannot merge with main, and MUST name the
+files that conflict.
 AI-generated changes MUST be labelled.
 
 ### ENG-22
