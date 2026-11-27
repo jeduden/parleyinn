@@ -2,7 +2,7 @@
 # Moves pr-head to the pull request's head merged into the commit main's
 # checkout, the working directory, holds, and writes pr.diff from main to
 # that merge, so the review reads the pull request as landing it would
-# leave main (ENG-28). A head that holds main is its own merge. Read
+# leave main (ENG-21). A head that holds main is its own merge. Read
 # alone, a head that merged main and another pull request apart has two
 # merge bases with main once main merged that one, and a three-dot diff
 # reads that one's change as its own; a head behind main differs from
@@ -25,7 +25,7 @@ if ! git -C pr-head merge-base --is-ancestor "$main" "$head"; then
   set -e
   if [ "$code" -eq 1 ]; then
     files=$(printf '%s\n' "$out" | sed -n '2,/^$/p' | sed '/^$/d' | paste -sd ' ' -)
-    echo "::error::the head does not merge with main, so it is not reviewed (ENG-28): $files conflict; merge main into the branch"
+    echo "::error::the head does not merge with main, so it is not reviewed (ENG-21): $files conflict; merge main into the branch"
     exit 1
   fi
   if [ "$code" -ne 0 ]; then

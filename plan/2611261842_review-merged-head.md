@@ -6,7 +6,7 @@ summary: >-
   The review, its evaluation and the local review read a pull request's
   head merged into main, never the head alone, so a stacked or
   out-of-date branch is reviewed on what it changes, and a head that
-  does not merge with main is not reviewed. ENG-28 says so; its
+  does not merge with main is not reviewed. ENG-21 says so; its
   scenario runs the merge on four histories.
 model: opus
 depends-on: []
@@ -49,13 +49,16 @@ head, and it stays as it is. `scripts/ci-local.sh` picks its gates from
 the files changed since one merge base, which at worst runs more of
 them.
 
-Requirements. ENG-28 gains the sentence; its scenario gains two steps,
-the workflow's wiring and the merge on four histories. No scenario
-comes off `@pending`.
+Requirements. ENG-21, which has main move only through reviewed pull
+requests, gains the sentence; its scenario gains two steps, the
+workflow's wiring and the merge on four histories. ENG-21 holds 30
+lines, under the srs kind's 50. ENG-28, the review gate, already holds
+more, so it and `.mdsmith.yml` stay as they are. No scenario comes off
+`@pending`.
 
 ## Tasks
 
-1. RED: ENG-28's scenario holds a step that runs the merge on a branch
+1. RED: ENG-21's scenario holds a step that runs the merge on a branch
    that merged main and its parent apart after main merged the parent,
    a branch behind main, a head that holds main and a head that
    conflicts, and one that finds the review job, the evaluation's job
@@ -71,9 +74,9 @@ comes off `@pending`.
    `pr-head` then holds the merge, the review job tells review-run the
    head, as the local review does, so a comment's review still reuses
    the verdict of the same head.
-4. ENG-28 says the review reads the head merged into main and does not
-   run on a head that does not merge; `.mdsmith.yml` lists ENG-28 at its
-   new length. Each step's check lands with a drift case.
+4. ENG-21 says the review reads the head merged into main and does not
+   run on a head that does not merge. Each step's check lands with a
+   drift case.
 5. [docs/ci.md](../docs/ci.md) says what the review reads.
 
 ## Outcome
@@ -83,7 +86,7 @@ Read alone, it diffs 52 files from the first of two merge bases and
 dispatches 17 agents. Merged into main, it diffs its own 5 files and
 dispatches 5. Against a main that then merged phase 17, the head alone
 plans 42 components and 141 cases, about 11.88 USD; merged, it plans
-none. ENG-28's scenario passes with its two new steps, which the
+none. ENG-21's scenario passes with its two new steps, which the
 cucumber runner runs on four histories. The drift suite catches each
 of the six new cases, among the 33 that inject a file the change
 touches.
@@ -96,5 +99,5 @@ touches.
       change
 - [x] A head that does not merge with main is not reviewed, and the run
       names the files that conflict
-- [x] ENG-28's scenario passes with both steps, and a drift case fails
+- [x] ENG-21's scenario passes with both steps, and a drift case fails
       each

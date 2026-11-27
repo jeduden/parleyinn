@@ -1,4 +1,4 @@
-//! ENG-28: the review reads a pull request as landing it would leave
+//! ENG-21: the review reads a pull request as landing it would leave
 //! main. `scripts/review-merge-head.sh` moves the review's `pr-head` to
 //! the pull request's head merged into the commit main's checkout holds,
 //! and writes `pr.diff` from main to that merge; a head that holds main

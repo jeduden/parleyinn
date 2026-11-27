@@ -24,8 +24,6 @@ on that head before the agents reported a blocking finding, on the head the
 agents reviewed, once CI passed there, and MUST request changes otherwise.
 It MUST post its decision on that head as a check that passes only when it
 approves.
-The review MUST read the head as git merges it into main, as landing it would
-leave main, and MUST NOT run on a head that git cannot merge with main.
 The review MUST be run by code, not by an orchestrating agent: a tool MUST run
 every specialist the review bundle dispatches from the changed paths and the
 touched requirements, each as its own agent, and each dispatched generalist once

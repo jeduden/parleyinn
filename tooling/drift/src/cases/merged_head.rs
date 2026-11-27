@@ -1,5 +1,5 @@
 //! The drifts of how the review reads a pull request as landing it
-//! would leave main (ENG-28): the head merged into main, never the head
+//! would leave main (ENG-21): the head merged into main, never the head
 //! alone, apart from the registry's other cases so its file grows no
 //! further.
 
@@ -11,7 +11,7 @@ const WORKFLOW: &str = ".github/workflows/review.yml";
 /// The script that merges the head into main.
 const SCRIPT: &str = "scripts/review-merge-head.sh";
 
-/// The drifts the merge exists to rule out (ENG-28): a job or the local
+/// The drifts the merge exists to rule out (ENG-21): a job or the local
 /// review that reads the head alone, an evaluation that cannot merge
 /// it, a review run that names the merge as the head, and a merge that
 /// diffs from a merge base or reviews a head that does not merge.
@@ -41,7 +41,7 @@ fn wiring_cases() -> Vec<Case> {
     vec![
         case(
             "the review job that diffs the head alone from a merge base",
-            "ENG-28",
+            "ENG-21",
             Injection::replace(
                 WORKFLOW,
                 "        if: steps.pull_head.outputs.number != ''\n        run: scripts/review-merge-head.sh\n",
@@ -52,7 +52,7 @@ fn wiring_cases() -> Vec<Case> {
         ),
         case(
             "the evaluation's job that checks the head out without its history",
-            "ENG-28",
+            "ENG-21",
             Injection::replace(
                 WORKFLOW,
                 "          ref: ${{ needs.review.outputs.head_sha }}\n          path: pr-head\n          fetch-depth: 0\n",
@@ -63,7 +63,7 @@ fn wiring_cases() -> Vec<Case> {
         ),
         case(
             "a review run that names the merge as the head",
-            "ENG-28",
+            "ENG-21",
             Injection::replace(
                 WORKFLOW,
                 "--head-sha \"$HEAD_SHA\" ${PREVIOUS",
@@ -74,7 +74,7 @@ fn wiring_cases() -> Vec<Case> {
         ),
         case(
             "the local review that diffs the head alone from a merge base",
-            "ENG-28",
+            "ENG-21",
             Injection::replace(
                 "scripts/review-local.sh",
                 "\"$repo/scripts/review-merge-head.sh\"\n",
@@ -91,7 +91,7 @@ fn merge_cases() -> Vec<Case> {
     vec![
         case(
             "a merge whose diff reads another pull request's change as the head's",
-            "ENG-28",
+            "ENG-21",
             Injection::replace(
                 SCRIPT,
                 "git -C pr-head diff \"$main\" \"$merge\" > pr.diff",
@@ -102,7 +102,7 @@ fn merge_cases() -> Vec<Case> {
         ),
         case(
             "a merge that reviews a head that does not merge with main",
-            "ENG-28",
+            "ENG-21",
             Injection::replace(SCRIPT, "  code=$?\n", "  code=0\n"),
             merge_check(),
             "reviews a head that does not merge with main",
