@@ -88,7 +88,7 @@ dispatches 5. Against a main that then merged phase 17, the head alone
 plans 42 components and 141 cases, about 11.88 USD; merged, it plans
 none. ENG-21's scenario passes with its two new steps, which the
 cucumber runner runs on four histories. The drift suite catches each
-of the six new cases, among the 33 that inject a file the change
+of the seven new cases, among the 47 that inject a file the change
 touches.
 
 ## Acceptance Criteria

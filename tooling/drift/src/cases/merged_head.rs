@@ -62,6 +62,17 @@ fn wiring_cases() -> Vec<Case> {
             "job evaluate checks the head out without its history",
         ),
         case(
+            "the review job that bundles the head before it merges it",
+            "ENG-21",
+            Injection::replace(
+                WORKFLOW,
+                "      - name: Merge the head into main, as landing it would leave main\n",
+                "      - run: scripts/review-bundle.sh\n      - name: Merge the head into main, as landing it would leave main\n",
+            ),
+            wiring_check(),
+            "job review holds run: scripts/review-bundle.sh before run: scripts/review-merge-head.sh",
+        ),
+        case(
             "a review run that names the merge as the head",
             "ENG-21",
             Injection::replace(
