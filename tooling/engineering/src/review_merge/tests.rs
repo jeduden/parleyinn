@@ -283,6 +283,20 @@ fn a_missing_script_is_named_once_however_many_orders_want_it() {
 }
 
 #[test]
+fn a_script_that_writes_no_diff_is_named_with_the_read_error() {
+    let root = testkit::TempDir::new().unwrap();
+    let work = testkit::TempDir::new().unwrap();
+    let checkout = with_script(root.path(), "exit 0\n");
+    let problems = merge_problems(&checkout, work.path());
+    assert_eq!(problems.len(), 1, "{problems:?}");
+    assert!(
+        problems[0].starts_with("scripts/review-merge-head.sh could not be tried: read "),
+        "{problems:?}"
+    );
+    assert!(problems[0].contains("pr.diff: "), "{problems:?}");
+}
+
+#[test]
 fn wiring_problems_name_a_file_that_cannot_be_read() {
     let root = testkit::TempDir::new().unwrap();
     assert!(

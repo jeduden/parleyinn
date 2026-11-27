@@ -380,7 +380,9 @@ fn merge(
             ..Merged::default()
         });
     }
-    let diff = fs::read_to_string(dir.join("pr.diff")).unwrap_or_default();
+    let written = dir.join("pr.diff");
+    let diff =
+        fs::read_to_string(&written).map_err(|e| format!("read {}: {e}", written.display()))?;
     let at = git.run(&head, &["rev-parse", "HEAD"])?;
     let differs = git.run(&head, &["diff", "--name-only", &tried.main, "HEAD"])?;
 
