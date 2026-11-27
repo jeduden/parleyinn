@@ -157,6 +157,9 @@ The review's agents MUST have no credential that can approve or write.
 6. Each requirement the srs kind lists past 50 lines is split into
    requirements that fit, each with its scenario, and leaves the
    list. One only shortened has its entry lowered to its length.
+   A split that changes no file the stakeholder owns leaves its entry
+   for the next change to `.mdsmith.yml`, which asks for consent
+   anyway (phase 18).
 
 ## Execution
 
@@ -177,6 +180,7 @@ The review's agents MUST have no credential that can approve or write.
 | 13    | sonnet | §6.1 moves to 06a, word for word; SEC-17 passes                                                                                                                      |
 | 14    | sonnet | ENG-28 and ENG-32 are blocks, word for word; the gates pass                                                                                                          |
 | 15    | sonnet | A requirement table fails the parse gate; the tests pass                                                                                                             |
+| 18    | sonnet | SEC-31 fits in 50 lines, SEC-33 holds its receipt; the gates pass                                                                                                    |
 
 ## Phases
 
@@ -231,6 +235,7 @@ footer: |
 |     | ↳      | ENG-28 and ENG-32, the review section's two requirements, are each written as a block, and neither changes: main's review bundle shows each with main's text alone. ENG-28 holds 193 lines, the length the srs kind lists it at. No requirement table is left in the SRS. No scenario comes off @pending.                                                                                                                                                                                                                                 |
 | 15  | ✅     | [The parser refuses a requirement table](phase-15.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 |     | ↳      | The srs crate's parser, which every gate shares, reads a requirement only as a block and refuses a requirement table with its file, its header's line and what to do. A drift case proves the parse gate catches one. No requirement changes, and no scenario comes off @pending.                                                                                                                                                                                                                                                         |
+| 18  | 🔳     | [SEC-31's purge receipt in a requirement of its own](phase-18.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 <?/catalog?>
 
 ## Acceptance Criteria
