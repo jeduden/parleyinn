@@ -92,7 +92,8 @@ pub fn wiring_problems(checkout: &Checkout) -> Result<Vec<String>, String> {
     problems.extend(merge_base_problems(LOCAL, &local));
     problems.extend(head_problems(LOCAL, &local));
     // A missing script is named once, however many orders want it.
-    problems.dedup();
+    let mut named = BTreeSet::new();
+    problems.retain(|p| named.insert(p.clone()));
 
     Ok(problems)
 }

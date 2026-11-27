@@ -259,6 +259,30 @@ fn head_problems_want_the_run_told_the_head() {
 }
 
 #[test]
+fn a_missing_script_is_named_once_however_many_orders_want_it() {
+    let root = testkit::TempDir::new().unwrap();
+    let workflow = root.path().join(WORKFLOW);
+    fs::create_dir_all(workflow.parent().unwrap()).unwrap();
+    fs::copy(testkit::repo_root().join(WORKFLOW), &workflow).unwrap();
+    // The local review adds the head's worktree, then runs neither the
+    // script nor the bundle, so two orders want the script.
+    with_script(root.path(), "");
+    fs::write(
+        root.path().join(LOCAL),
+        "git worktree add \"$work/pr-head\" HEAD\nreview-run --head-sha\n",
+    )
+    .unwrap();
+    let missing = format!("{LOCAL} does not hold {SCRIPT}");
+    assert_eq!(
+        wiring_problems(&Checkout::new(root.path())),
+        Ok(vec![
+            missing,
+            format!("{LOCAL} does not hold tool review-bundle"),
+        ])
+    );
+}
+
+#[test]
 fn wiring_problems_name_a_file_that_cannot_be_read() {
     let root = testkit::TempDir::new().unwrap();
     assert!(
