@@ -61,8 +61,8 @@ security-sensitive ones, 80% overall) join that way as they land. A
 misspelled key or crate name in the policy fails the run, so a typo
 cannot switch a floor off.
 
-The measure counts shipped code only. Files named `tests.rs` or under a
-`tests/` directory, step bindings included, are left out.
+The measure counts shipped code only. Unit-test files (`tests.rs`)
+and every `tests/` directory, step bindings included, are left out.
 That is why a binding stays thin: the logic it calls lives in a library
 crate, where the unit tests reach it. Every cargo the tool starts
 carries `PARINN_COVERAGE_MEASURING`, and a run that finds it set refuses

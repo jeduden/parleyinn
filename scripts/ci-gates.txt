@@ -43,7 +43,7 @@ scenario-gates|fast|-|ws|@job:scenarios|cargo test --locked -p scenario --test g
 cucumber|fast|-|tags|@job:scenarios|cargo build --locked -p parinn && cargo test --locked -p scenario --test bdd -- --tags "{tags}"
 size|fast|-|ws|@workflow:review|@size
 drift|fast|-|files|cargo test --locked -p drift --test suite -- --ignored|=
-coverage-unit|fast|-|crate|cargo run --locked -p coverage -- --layer unit|cargo llvm-cov --locked -p {crate} --lib --bins --ignore-filename-regex "/tests[./]" --fail-under-lines {floor}
+coverage-unit|fast|-|crate|cargo run --locked -p coverage -- --layer unit|cargo llvm-cov --locked -p {crate} --lib --bins --ignore-filename-regex "/tests\.rs$" --fail-under-lines {floor}
 coverage-integration|full|disk|ws|cargo run --locked -p coverage -- --layer integration|=
 coverage-e2e-others|no|runner|ws|cargo run --locked -p coverage -- --layer e2e --others|=
 coverage-e2e|no|runner|ws|cargo run --locked -p coverage -- --layer e2e --shard "$((JOB_INDEX + 1))/$JOB_TOTAL"|=

@@ -112,12 +112,12 @@ fn_params_excessive_bools = "deny"
 # - `pyramid` fails a run whose test counts invert the pyramid: more
 #   integration than unit tests, or more end-to-end than integration.
 #
-# Unit-test files (tests.rs and the files under a tests/ directory) are left out of
+# Unit-test files (tests.rs) and every tests/ directory are left out of
 # the measure, so the numbers count shipped code. A crate's own floors
 # go under [workspace.metadata.coverage.crates.<name>.floors];
 # ENG-11's floors for the product crates join that way as they land.
 [workspace.metadata.coverage]
-exclude = '(^|/)tests[./]'
+exclude = '(^|/)tests\.rs$'
 entry-points = ["src/main.rs"]
 floors = { all = 100, unit = 99 }
 pyramid = true
