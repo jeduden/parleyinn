@@ -519,7 +519,8 @@ fn a_long_text_is_previewed_to_512_bytes_inline_or_in_the_payload_store() {
         ..new_event(1)
     };
     store.append(writer(1), &[long(300)]).unwrap();
-    let mut spilled = open(&TempDir::new().unwrap()).with_payload_threshold(10);
+    let spilled_dir = TempDir::new().unwrap();
+    let mut spilled = open(&spilled_dir).with_payload_threshold(10);
     spilled.append(writer(1), &[long(2000)]).unwrap();
 
     assert_eq!(store.preview(address(1)).unwrap().unwrap().len(), 512);
