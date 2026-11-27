@@ -320,8 +320,8 @@ jobs:
       actions: read
       contents: read
     steps:
-      # Main's checkout comes first, for the scripts it holds and, when
-      # a component changed, the tree the fixture worlds are worktrees of.
+      # Main's checkout, the run's github.sha as in the review job, comes
+      # first, for its scripts and the tree the fixture worlds are worktrees of.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
