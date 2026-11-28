@@ -93,5 +93,8 @@ fn run_fails_a_run_whose_world_s_requirements_do_not_read() {
     let (code, out, err) = run_lang_rust(&host, dir.path(), &out_dir);
 
     assert_eq!(code, EXIT_FAILURE, "{out}\n{err}");
-    assert!(err.contains("a requirement table"), "{err}");
+    assert!(
+        err.contains("docs/srs/99.md:1: a requirement table"),
+        "{err}"
+    );
 }
