@@ -1,0 +1,371 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body><title>Check Receipt Open Questions</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Space+Grotesk:wght@500;600&display=swap">
+<style>
+/* Layout: one reading column; each question is a band with today's model, option cards in a grid, and a recommendation strip. */
+:root{
+  --bg:#f6f7f6; --panel:#ffffff; --ink:#18211f; --muted:#56635f; --line:#d5dcd9;
+  --accent:#0f6b5c; --accent-bg:#e3f1ed; --rec:#8a5a00; --rec-bg:#fbf1dc;
+  --no:#9b2c2c; --no-bg:#f8e6e4; --fact:#2f5a8a; --fact-bg:#e5edf7;
+  --f-display:"Space Grotesk",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#121816; --panel:#1a2220; --ink:#e4ebe8; --muted:#9aa8a3; --line:#2e3a37;
+  --accent:#5cc4ad; --accent-bg:#183630; --rec:#f0c068; --rec-bg:#352a14;
+  --no:#f08a80; --no-bg:#3a1f1d; --fact:#8cb6e8; --fact-bg:#1c2a3b; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#121816; --panel:#1a2220; --ink:#e4ebe8; --muted:#9aa8a3; --line:#2e3a37;
+  --accent:#5cc4ad; --accent-bg:#183630; --rec:#f0c068; --rec-bg:#352a14;
+  --no:#f08a80; --no-bg:#3a1f1d; --fact:#8cb6e8; --fact-bg:#1c2a3b; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:15px/1.6 var(--f-body);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:32px 64px}
+main{max-width:1060px;margin:0 auto;display:flex;flex-direction:column;gap:40px}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0;line-height:1.2}
+h1{font-size:2rem}
+h2{font-size:1.45rem}
+h3{font-size:1.02rem}
+p{margin:0;max-width:72ch}
+code{font-family:var(--f-mono);font-size:.88em;background:var(--accent-bg);padding:1px 5px;border-radius:4px;overflow-wrap:anywhere}
+a{color:var(--accent)}
+.lede{display:flex;flex-direction:column;gap:12px}
+.eyebrow{font:500 .78rem var(--f-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.tag{display:inline-block;font:500 .7rem var(--f-mono);letter-spacing:.05em;text-transform:uppercase;padding:1px 6px;border-radius:4px;vertical-align:1px;margin-right:4px}
+.tag.f{background:var(--fact-bg);color:var(--fact)}
+.tag.j{background:var(--rec-bg);color:var(--rec)}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:640px;background:var(--panel)}
+th,td{text-align:left;vertical-align:top;padding:10px 12px;border-bottom:1px solid var(--line)}
+th{font:600 .8rem var(--f-body);color:var(--muted);letter-spacing:.03em}
+td:first-child{font-weight:600;white-space:nowrap}
+section.q{display:flex;flex-direction:column;gap:16px;padding-top:28px;border-top:2px solid var(--ink)}
+.today{background:var(--fact-bg);border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:8px}
+.today p{max-width:none}
+.opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.opt{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.opt.pick{border:2px solid var(--rec)}
+.opt.out{opacity:.88}
+.opt header{display:flex;flex-direction:column;gap:4px}
+.verdict{font:600 .72rem var(--f-mono);letter-spacing:.05em;text-transform:uppercase}
+.pick .verdict{color:var(--rec)}
+.out .verdict{color:var(--no)}
+.later .verdict{color:var(--accent)}
+dl{margin:0;display:grid;gap:6px}
+dt{font:600 .74rem var(--f-body);color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+dd{margin:0 0 4px}
+.rec{background:var(--rec-bg);border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:8px}
+.rec p{max-width:none}
+figure{margin:0;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px}
+figure svg{width:100%;height:auto;display:block}
+figcaption{color:var(--muted);font-size:.88rem;margin-top:8px}
+svg text{font-family:var(--f-body);fill:currentColor;font-size:12px}
+svg .box{fill:var(--panel);stroke:currentColor;stroke-width:1.2}
+svg .core{fill:var(--accent-bg);stroke:var(--accent);stroke-width:1.5}
+svg .arr{stroke:currentColor;stroke-width:1.3;fill:none}
+svg .lbl{font-size:11px;fill:var(--muted)}
+.src{color:var(--muted);font-size:.86rem}
+ul{margin:0;padding-left:1.2em;max-width:72ch}
+li{margin-bottom:4px}
+</style>
+
+<main>
+<div class="lede">
+  <div class="eyebrow">Plan 2611280904 · phase 1 · 28 November 2026</div>
+  <h1>Result receipt: four open questions</h1>
+  <p>The domain-model agent left four questions open when it read the plan. Each one below shows what the model and the SRS say today, two to four ways to answer it, what each way changes, and the one I recommend. Quotes come from <code>docs/domain-model/</code> and <code>docs/srs/</code> on the default branch as of today.</p>
+  <p class="src"><span class="tag f">Fact</span> what the repository says. <span class="tag j">Judgement</span> my reading and my recommendation.</p>
+</div>
+
+<section>
+  <h2 style="margin-bottom:12px">The recommendations at a glance</h2>
+  <div class="scroll">
+  <table>
+    <thead><tr><th>Question</th><th>Recommendation</th><th>What changes in the model and SRS</th><th>Needs the stakeholder</th></tr></thead>
+    <tbody>
+      <tr><td>1. Signing key</td><td>The editing node’s own key: its device key, or on an ephemeral node the token key its access token carries</td><td>None to SEC-10. A fixed domain tag in the signed bytes. The file on the default branch lists device keys, not node keys</td><td>No</td></tr>
+      <tr><td>2. Its place</td><td>A third receipt kind, the result receipt. Its results keep evidence class <code>own check</code></td><td>Receipt gains a third qualifier. LANE-05 unchanged. New requirement and CLI row</td><td>No</td></tr>
+      <tr><td>3. Tooling or component</td><td>The action is how the CLI ships to a forge, the adoption path for other projects. The check script is a template each project owns, until the launcher takes over after ENG-29</td><td>No new component. OQ-32 gains the action as a shipping form, and a requirement makes it a stable interface</td><td>Later, for ENG-29’s named security reviewer</td></tr>
+      <tr><td>4. Command names</td><td><code>parinn result-receipt plan|make|check</code></td><td>One CLI row in §9.5, beside the head receipt. Only <code>plan</code> is a new verb</td><td>No</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<figure>
+  <svg viewBox="0 0 960 210" role="img" aria-label="The editing node's core lists the checks, captures each one from the run's transcript and signs a result receipt with its own key; the receipt travels with the branch; on GitHub the action runs the locked parinn to check it with no network and reports beside CI.">
+    <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker></defs>
+    <rect x="10" y="20" width="440" height="170" rx="8" class="box"/>
+    <text x="24" y="42" font-weight="600">Editing node (ephemeral)</text>
+    <rect x="24" y="58" width="190" height="52" rx="6" class="box"/>
+    <text x="36" y="80">Editing run</text>
+    <text x="36" y="98" class="lbl">runs each check as a tool call</text>
+    <rect x="24" y="124" width="190" height="52" rx="6" class="box"/>
+    <text x="36" y="146">Check script (project’s own)</text>
+    <text x="36" y="164" class="lbl">starts one check, exits</text>
+    <rect x="250" y="58" width="186" height="118" rx="6" class="core"/>
+    <text x="262" y="80" font-weight="600">Core (B0)</text>
+    <text x="262" y="100" class="lbl">result-receipt plan: lists checks</text>
+    <text x="262" y="118" class="lbl">captures each result</text>
+    <text x="262" y="136" class="lbl">result-receipt make: signs</text>
+    <text x="262" y="154" class="lbl">with device or token key</text>
+    <line x1="119" y1="110" x2="119" y2="124" class="arr" marker-end="url(#ah)"/>
+    <line x1="214" y1="84" x2="250" y2="84" class="arr" marker-end="url(#ah)"/>
+    <text x="216" y="76" class="lbl">transcript</text>
+    <rect x="490" y="80" width="130" height="52" rx="6" class="box"/>
+    <text x="502" y="102">Result receipt</text>
+    <text x="502" y="120" class="lbl">git ref or file</text>
+    <line x1="436" y1="106" x2="490" y2="106" class="arr" marker-end="url(#ah)"/>
+    <rect x="660" y="20" width="290" height="170" rx="8" class="box"/>
+    <text x="674" y="42" font-weight="600">GitHub runner</text>
+    <rect x="674" y="58" width="262" height="52" rx="6" class="box"/>
+    <text x="686" y="80">Action (ships the CLI)</text>
+    <text x="686" y="98" class="lbl">runs the locked parinn, reports</text>
+    <rect x="674" y="124" width="262" height="52" rx="6" class="core"/>
+    <text x="686" y="146">parinn result-receipt check</text>
+    <text x="686" y="164" class="lbl">no network, no agent, no credential</text>
+    <line x1="620" y1="106" x2="674" y2="84" class="arr" marker-end="url(#ah)"/>
+    <line x1="805" y1="110" x2="805" y2="124" class="arr" marker-end="url(#ah)"/>
+  </svg>
+  <figcaption>How the four recommendations fit together. Only the core signs and checks. The action wraps one call to it, and the check script starts one program; neither holds a key.</figcaption>
+</figure>
+
+<!-- Q1 -->
+<section class="q" id="key">
+  <div class="eyebrow">Question 1</div>
+  <h2>Which key signs a result receipt?</h2>
+  <div class="today">
+    <p><span class="tag f">Fact</span> SEC-10: “The core MUST handle no credential other than its seat keys, the node’s device key and, until it leaves the node, its recovery key, on an ephemeral node the token key its access token carries…”. A CI key is not on that list.</p>
+    <p><span class="tag f">Fact</span> The model: a token key is one “a device key certifies by a token certificate… for an ephemeral node”, and “a node with only a token key signs no principal act”. A CI key is “a key the room’s owner enrolled in the room to sign CI attestations”.</p>
+  </div>
+  <div class="opts">
+    <article class="opt pick">
+      <header><span class="verdict">Recommended</span><h3>A. The node’s own key</h3></header>
+      <p>The device key, or on an ephemeral node the token key. The receipt carries the token certificate, so a check walks back to a device key.</p>
+      <dl>
+        <dt>Model and SRS</dt><dd>No new key. SEC-10 already covers both keys.</dd>
+        <dt>Trust on GitHub</dt><dd>The default branch lists one device key per person. Every ephemeral node is covered by its token certificate, which expires with the access token.</dd>
+        <dt>Risk</dt><dd>The device key also signs principal acts. A fixed domain tag at the start of the signed bytes keeps a receipt from ever reading as one. A token key signs no principal act at all.</dd>
+        <dt>Other projects</dt><dd>Nothing to enrol beyond the device key they already have.</dd>
+      </dl>
+    </article>
+    <article class="opt">
+      <header><span class="verdict">Possible</span><h3>B. The editing run’s seat key</h3></header>
+      <p>The key that seals the run’s writer signs the receipt.</p>
+      <dl>
+        <dt>Model and SRS</dt><dd>No new key, but a seat key “signs the seat’s room acts and seals its writer”. A receipt is neither, so the definition widens.</dd>
+        <dt>Trust on GitHub</dt><dd>A new seat key per run. GitHub still needs the chain up to a device key, so this adds a link and gains nothing.</dd>
+        <dt>Gain</dt><dd>Ties the receipt to the run’s writer, which an auditor can also get from a writer id in the receipt.</dd>
+      </dl>
+    </article>
+    <article class="opt out">
+      <header><span class="verdict">Rejected</span><h3>C. A CI key</h3></header>
+      <p>Enrol a CI key in the room and give it to the editing node.</p>
+      <dl>
+        <dt>Model and SRS</dt><dd>SEC-10 grows to hold a CI key in the core.</dd>
+        <dt>Effect</dt><dd>Its results would read as <code>CI attested</code>, the top evidence class, for checks run on the node the agent controls. That overclaims, and it puts the CI key where the threat model’s B3 can reach it.</dd>
+      </dl>
+    </article>
+    <article class="opt out">
+      <header><span class="verdict">Rejected</span><h3>D. A new check key</h3></header>
+      <p>A key kind minted per node or per release, only for receipts.</p>
+      <dl>
+        <dt>Model and SRS</dt><dd>A new concept in seats and keys, a SEC-10 change, and an enrolment act.</dd>
+        <dt>Effect</dt><dd>Separation that option A’s domain tag already gives. A key per release would be held by whoever builds the release, which signs nothing about a commit.</dd>
+      </dl>
+    </article>
+  </div>
+  <div class="rec">
+    <p><span class="tag j">Judgement</span> Take A. A result receipt is the node saying what it ran, so the node’s own key is the honest signer. The file on the default branch that phase 7 adds lists device keys; the check accepts a token key only through a token certificate from one of them, inside its expiry.</p>
+  </div>
+</section>
+
+<!-- Q2 -->
+<section class="q" id="place">
+  <div class="eyebrow">Question 2</div>
+  <h2>Where does a result receipt stand?</h2>
+  <div class="today">
+    <p><span class="tag f">Fact</span> A receipt is “a signed statement about a node’s record, made to be kept apart from the home and checked with no network. Always qualified”: a head receipt or a purge receipt. The CLI has <code>parinn head-receipt make|check</code>.</p>
+    <p><span class="tag f">Fact</span> LANE-05’s closed set: <code>claim</code> &lt; <code>own check</code> &lt; <code>witness check</code> &lt; <code>CI attested</code>. An own check is “a check capture recorded from the editing run’s transcript on that run’s node”, failing or passing by the tool result’s structural <code>is_error</code>. A witness check runs “outside any agent context”, by a node whose git identity authored no commit on the branch.</p>
+  </div>
+  <div class="opts">
+    <article class="opt pick">
+      <header><span class="verdict">Recommended</span><h3>A. A third receipt kind</h3></header>
+      <p>A result receipt states, for one commit, the own-check results the node recorded, the digest of the <code>parinn</code> release, and the review outcome the review tooling kept.</p>
+      <dl>
+        <dt>Model and SRS</dt><dd>Receipt gains a third qualifier. It fits as written: it is about the node’s record, kept apart from the home, checked offline. LANE-05 does not change.</dd>
+        <dt>Evidence class</dt><dd>Each result stays <code>own check</code>, or <code>claim</code> when unbound. A verified receipt proves the signature and the digests, never a higher class.</dd>
+        <dt>Cost</dt><dd>To stay an own check, each check runs as a tool call of the editing run, so its exit status is a capture. The run can still start checks side by side.</dd>
+        <dt>Carried as</dt><dd>A git ref or a file beside the branch, like a bundle. It holds digests and exit statuses, no content.</dd>
+      </dl>
+    </article>
+    <article class="opt">
+      <header><span class="verdict">Possible</span><h3>A2. The same, and widen own check</h3></header>
+      <p>The check script hands exit statuses straight to the core, not through the transcript.</p>
+      <dl>
+        <dt>Model and SRS</dt><dd>Own check’s definition and LANE-05 both change: a second, non-transcript source of a result.</dd>
+        <dt>Effect</dt><dd>Faster, one script run for all checks. But a source the transcript does not show is what the white-box view relies on to detect B2 and B3, so it weakens detection.</dd>
+      </dl>
+    </article>
+    <article class="opt out">
+      <header><span class="verdict">Rejected</span><h3>B. A bundle, no new receipt</h3></header>
+      <p>Export the run’s events in a bundle and let the job read the results from it.</p>
+      <dl>
+        <dt>Model and SRS</dt><dd>None.</dd>
+        <dt>Effect</dt><dd>A bundle carries record content to a public forge, and the job would parse the record format. Far heavier than the few lines a receipt needs.</dd>
+      </dl>
+    </article>
+    <article class="opt out">
+      <header><span class="verdict">Rejected</span><h3>C. A CI attestation</h3></header>
+      <p>Treat the verified receipt as CI attested.</p>
+      <dl>
+        <dt>Effect</dt><dd>Needs a CI key (question 1, option C) and overclaims. A new class between own check and witness check would change LANE-05’s closed set for the same reason.</dd>
+      </dl>
+    </article>
+  </div>
+  <div class="rec">
+    <p><span class="tag j">Judgement</span> Take A. The result receipt is a receipt like the other two, and its results are what they already are: own checks. What lets GitHub accept it on ordinary paths is the rule in ENG-16 and the file on the default branch, not a raised class. The review outcome it carries is engineering tooling (ENG-28) and is not a result.</p>
+  </div>
+</section>
+
+<!-- Q3 -->
+<section class="q" id="component">
+  <div class="eyebrow">Question 3</div>
+  <h2>Are the GitHub action and the check script tooling or components?</h2>
+  <div class="today">
+    <p><span class="tag f">Fact</span> The component set is closed: &ldquo;a new one is a model change and a &sect;6.3 row&rdquo;, while &ldquo;how the components ship is open (OQ-32)&rdquo;. OQ-32 still asks &ldquo;whether the components ship as one executable or as one download of several&rdquo;. The CLI is part of the core (B0). The launcher is &ldquo;the only component that starts programs, but for the core&rsquo;s own kernel worker&rdquo;. ENG-29: no B1 to B3 component past a prototype without a decision record a named human security reviewer approves.</p>
+    <p><span class="tag f">Fact</span> Engineering tooling, in the model&rsquo;s naming rules, is this repository&rsquo;s own machinery (the review gate, answer keys, the size list). Nothing another project takes from a release is in that list today.</p>
+  </div>
+  <p><span class="tag j">Judgement</span> The action is the way a second project adopts ParleyInn: one <code>uses:</code> line, called by commit hash, and the locked <code>parinn</code>. That makes it something ParleyInn ships and keeps stable, which this repository&rsquo;s tooling never promises. The check script is different: it starts programs, and only the launcher may do that among ParleyInn&rsquo;s parts. The options below split the two along that line.</p>
+  <div class="opts">
+    <article class="opt pick">
+      <header><span class="verdict">Recommended</span><h3>A. The action ships the CLI; each project owns its check script</h3></header>
+      <p>The action is a way the core&rsquo;s CLI ships to a forge: it fetches the release of <code>parinn</code> named by its own version, checks the release signature, and runs <code>parinn result-receipt check</code>. The check script ships as a template that a project copies into its own repository and owns.</p>
+      <dl>
+        <dt>Model and SRS</dt><dd>No new component. OQ-32 gains a third shipping form beside one executable and one download. A new requirement makes the action a product interface: its inputs, its outputs, what it exits with, and that it is released and signed with <code>parinn</code> (ENG-20).</dd>
+        <dt>Other projects</dt><dd>Adoption is one workflow file, a list of checks and a list of keys on their default branch. ParleyInn keeps the action&rsquo;s inputs, the receipt format and the list formats stable across a major version, with upgrade notes in the changelog (ENG-23).</dd>
+        <dt>Boundaries</dt><dd>The action runs only the core, offline; the release fetch is GitHub&rsquo;s, before it. ParleyInn ships nothing that starts programs outside the launcher, because the copied script is the project&rsquo;s own code.</dd>
+        <dt>Cost</dt><dd>Each project keeps its copy of the script up to date by hand until the launcher takes over.</dd>
+      </dl>
+    </article>
+    <article class="opt">
+      <header><span class="verdict">Possible</span><h3>B. Both are this repository&rsquo;s tooling</h3></header>
+      <p>The action and the script stay engineering tooling, like the review gate, and the release simply carries them.</p>
+      <dl>
+        <dt>Model and SRS</dt><dd>None.</dd>
+        <dt>Other projects</dt><dd>They would depend on something ParleyInn calls internal: no requirement covers it, no compatibility promise, no scenario proves it. Phase 9&rsquo;s second project would be the first place a break shows.</dd>
+        <dt>Fit</dt><dd>Enough for dog-feeding in phases 3 to 7, short of what you asked for: an approach other projects can take.</dd>
+      </dl>
+    </article>
+    <article class="opt later">
+      <header><span class="verdict">Recommended later</span><h3>C. The launcher starts the checks</h3></header>
+      <p><code>parinn launch</code> runs each check outside the agent context, and the copied script goes away.</p>
+      <dl>
+        <dt>Model and SRS</dt><dd>No new component; the launcher already exists. SEC-29 and ENG-29 apply.</dd>
+        <dt>Other projects</dt><dd>Nothing left to copy: the action and the launcher both come from the one locked release.</dd>
+        <dt>Cost</dt><dd>Waits for ENG-29&rsquo;s decision record and its named reviewer. The launcher is off by default, B1.</dd>
+      </dl>
+    </article>
+    <article class="opt out">
+      <header><span class="verdict">Rejected</span><h3>D. New components, or the bridge</h3></header>
+      <p>A check runner and a receipt checker as new rows, or the action as part of the CI bridge.</p>
+      <dl>
+        <dt>Effect</dt><dd>New rows and an ENG-29 review for what the core and the launcher already cover. The bridge is B3, a network component off until turned on, and the check needs no network.</dd>
+      </dl>
+    </article>
+  </div>
+  <div class="rec">
+    <p><span class="tag j">Judgement</span> Take A, and plan C as the end state. The action is the adoption path, so it gets a requirement, a scenario and a stability promise like any other ParleyInn interface. The check script stays each project&rsquo;s own code, which keeps ParleyInn from shipping a second program starter, until the launcher replaces it after ENG-29. Phase 9 then proves the promise with a second project.</p>
+  </div>
+</section>
+
+<!-- Q4 -->
+<section class="q" id="names">
+  <div class="eyebrow">Question 4</div>
+  <h2>What are the subcommands called?</h2>
+  <div class="today">
+    <p><span class="tag f">Fact</span> The rule: a command on a concept is <code>parinn &lt;concept&gt; &lt;verb&gt;</code>, a multi-word concept in kebab case. <code>verify</code> is a node-wide utility: &ldquo;chains, seals, the completeness of transcript sources, widening acts, and each derived artifact against a rebuild&rdquo; (ADM-08). &sect;9.5 lists about 80 commands today; none starts with a bare <code>check</code>.</p>
+    <p><span class="tag f">Fact</span> The model&rsquo;s check is &ldquo;a command executed, or expected to execute because one of the intent&rsquo;s criteria names it&rdquo;. The default branch&rsquo;s list of checks is engineering tooling, not an intent&rsquo;s criteria.</p>
+  </div>
+  <h3>Where the new commands sit among today&rsquo;s</h3>
+  <div class="scroll">
+  <table>
+    <thead><tr><th>Family in &sect;9.5</th><th>Commands today</th><th>New or future</th><th>Fit</th></tr></thead>
+    <tbody>
+      <tr><td>Receipts</td><td><code>head-receipt make|check</code>, <code>purge-receipt check</code></td><td><code>result-receipt plan|make|check</code></td><td>Same shape and verbs. <code>plan</code> is the one new verb, and it is what only a result receipt needs</td></tr>
+      <tr><td>Checks and evidence</td><td><code>witness-check start</code>, <code>verdict record</code>, <code>ci-key enroll|revoke</code>, <code>risk-acceptance &hellip;</code></td><td>None now. Once the launcher takes over, it starts the checks under <code>result-receipt make</code>, the way it starts a witness check</td><td>The receipt states own checks and leaves the higher classes to these commands</td></tr>
+      <tr><td>Keys and tokens</td><td><code>access-token mint|rotate|revoke</code>, <code>device-key rotate</code></td><td>None. The token key from question 1 comes from <code>access-token mint</code></td><td>No key command is added</td></tr>
+      <tr><td>Node-wide utilities</td><td><code>verify</code>, <code>rebuild</code>, <code>doctor</code>, <code>status</code>, &hellip;</td><td>None. <code>verify</code> keeps checking this node&rsquo;s own record</td><td>A receipt from another node is checked by its own concept, as with the head receipt</td></tr>
+      <tr><td>Machine output</td><td><code>room list --json</code></td><td><code>result-receipt check --json</code> for the action</td><td>Same flag; exit status 0 only when every item passes</td></tr>
+    </tbody>
+  </table>
+  </div>
+    <h3>The concept&rsquo;s name</h3>
+  <p><span class="tag j">Judgement</span> The working name was &ldquo;check receipt&rdquo;. Its command <code>parinn check-receipt check</code> uses &ldquo;check&rdquo; twice in two senses, and the receipt does not state checks: it states results. The domain-model agent read the model for this and recommends &ldquo;result receipt&rdquo;; this page now uses it.</p>
+  <div class="scroll">
+  <table>
+    <thead><tr><th>Name</th><th>Command</th><th>Fit with the model</th><th>Verdict</th></tr></thead>
+    <tbody>
+      <tr><td>Result receipt</td><td><code>parinn result-receipt check</code></td><td>It states results, each with its evidence class, in the model&rsquo;s own word. Its definition must say: only own-check results, plus the release digest and the review outcome</td><td>Recommended</td></tr>
+      <tr><td>Check receipt</td><td><code>parinn check-receipt check</code></td><td>Reads as a receipt for one check, and doubles the word. Easy to confuse with the forge&rsquo;s required checks</td><td>Dropped</td></tr>
+      <tr><td>Commit receipt</td><td><code>parinn commit-receipt check</code></td><td>Names the subject, not what is stated; reads as a receipt that a commit was recorded</td><td>Weaker</td></tr>
+      <tr><td>Evidence, attestation or review receipt</td><td>&hellip;</td><td>Evidence is what a result rests on; attestation is the CI key&rsquo;s word; review is an engineering-tooling word</td><td>Rejected</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <div class="opts">
+    <article class="opt pick">
+      <header><span class="verdict">Recommended</span><h3>A. One concept, three verbs</h3></header>
+      <ul>
+        <li><code>parinn result-receipt plan &lt;commit&gt;</code>: what a receipt for this commit must hold, from the default branch&rsquo;s list, with each check&rsquo;s command</li>
+        <li><code>parinn result-receipt make &lt;commit&gt;</code>: sign what the record holds for it</li>
+        <li><code>parinn result-receipt check &lt;file&gt; [--json]</code>: the offline checklist</li>
+      </ul>
+      <dl>
+        <dt>Shape</dt><dd><code>parinn</code> + concept <code>result-receipt</code> (the new receipt kind, kebab case because it is two words) + verb <code>plan</code>, <code>make</code> or <code>check</code>. A bare <code>parinn receipt make --kind check</code> does not fit, because the model says a receipt is “always qualified”; it would also have to move <code>head-receipt</code> and <code>purge-receipt</code>.</dd>
+        <dt>Effect</dt><dd>Everything lives under one concept the model gains anyway, with the head receipt&rsquo;s verbs. No &ldquo;record&rdquo; verb is needed, since results arrive by capture.</dd>
+        <dt>Future</dt><dd>When the launcher starts the checks, <code>plan</code> and <code>make</code> keep their meaning; only who starts each check changes.</dd>
+      </dl>
+    </article>
+    <article class="opt">
+      <header><span class="verdict">Possible</span><h3>A2. <code>parinn check list</code> for the first step</h3></header>
+      <p>What the first draft of this page proposed.</p>
+      <dl>
+        <dt>Effect</dt><dd>Opens a bare <code>check</code> concept in the CLI, and lists checks a repository file names, which the model&rsquo;s check does not cover. It would claim the name before a later command on the intent&rsquo;s checks needs it.</dd>
+      </dl>
+    </article>
+    <article class="opt out">
+      <header><span class="verdict">Rejected</span><h3>B. Extend <code>parinn verify</code></h3></header>
+      <p><code>parinn verify --result-receipt &lt;file&gt;</code>, or <code>result-receipt verify</code>.</p>
+      <dl>
+        <dt>Effect</dt><dd><code>verify</code> checks this node&rsquo;s own record. A file from another node, on a GitHub runner with no home, is a different job, and the head receipt already settled the verb as <code>check</code>.</dd>
+      </dl>
+    </article>
+    <article class="opt out">
+      <header><span class="verdict">Rejected</span><h3>C. <code>parinn attest &hellip;</code></h3></header>
+      <p>A verb-first command.</p>
+      <dl>
+        <dt>Effect</dt><dd>Breaks the rule, and &ldquo;attest&rdquo; is the CI attestation&rsquo;s word, which this receipt is not.</dd>
+      </dl>
+    </article>
+  </div>
+  <div class="rec">
+    <p><span class="tag j">Judgement</span> Take A. It adds one concept and one verb to &sect;9.5, reuses the receipt family&rsquo;s other two verbs, and leaves <code>check</code> free for the intent&rsquo;s checks later. The domain-model agent should confirm <code>plan</code> before phase 3 names any function after it.</p>
+  </div>
+</section>
+
+<section class="q">
+  <div class="eyebrow">Next</div>
+  <h2>What phase 1 does with these</h2>
+  <ul>
+    <li>The model gains the result receipt in <code>record.md</code>, OQ-32 gains the action as a shipping form, and the check script template is named as each project’s own code.</li>
+    <li>The SRS gains the requirements phase 1 lists, one for the action as an interface other projects rely on, and one CLI row in §9.5, each with its scenario tagged <code>@pending</code>.</li>
+    <li>The proposed decision record carries these four answers beside the ENG-21 question.</li>
+    <li>The domain-model agent reviews the result; its findings block the phase until fixed or ruled on.</li>
+  </ul>
+  <p><span class="tag j">Judgement</span> None of the four needs your ruling. Only ENG-21 does, before phase 7. If you disagree with one, say which and I will rework that section.</p>
+</section>
+</main>
+</body></html>

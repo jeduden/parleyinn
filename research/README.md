@@ -83,7 +83,8 @@ from.
 - [Review attestation](notes/review-attestation/README.md): checks and
   the review run in the thread's own sandbox and signed into a receipt
   that a code-only job on GitHub verifies. The research on the status
-  quo and the design, as published HTML pages, and what was decided.
+  quo, the design and the plan's open questions, as published HTML
+  pages, and what was decided.
 - [SRS specialist review, round 33](notes/srs-specialist-review-33/README.md):
   twelve blind reviewers, one per model file plus the domain-model
   agent, read the SRS and scenarios against the model. Their 129
