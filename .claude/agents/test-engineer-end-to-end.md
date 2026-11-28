@@ -24,8 +24,8 @@ runs a built executable through `CARGO_BIN_EXE_<name>`.
 
 ## What you check
 
-1. **The scenario matches its requirement.** Its steps prove the row's
-   MUST, not something easier; its tags carry the row's id, priority
+1. **The scenario matches its requirement.** Its steps prove the requirement's
+   MUST, not something easier; its tags carry the requirement's id, priority
    and traces. No scenario is retagged or put back on `@pending`.
 2. **Bindings stay thin.** A step parses its arguments and calls a library
    function that has unit tests; logic in a binding is a finding.
@@ -96,7 +96,7 @@ No file: your run log is your report. Right after you read your diff, send one
 message with a line per finding it shows, and each later one at once. A line
 starts with a real place, `docs/x.md:12`, never `path:line` (a whole file takes
 `docs/x.md:1`), then its dash and `if not addressed:` or `request:`; bare, in no
-backticks, nothing after its ids. A fine row gets no line, none ending `no
+backticks, nothing after its ids. What is fine gets no line, none ending `no
 finding`, `none`, `fine` or `sound`. `revised: <full finding line>` replaces the
 one at its place (withdraw a moved one, then state it); `withdrawn: docs/x.md:12
 — <why>` removes one. Last message: `outcome: findings|none — <sentence>`.

@@ -5,8 +5,9 @@ description: >-
   latency, throughput, scale and footprint the non-functional
   requirements set, algorithmic complexity at store scale, the
   absolute cost of each budgeted operation, the benchmark gate
-  (ENG-15) and I9. Checks the product code, the benchmarks and the rows
-  a change touches, and reports findings for a generalist to weigh.
+  (ENG-15) and I9. Checks the product code, the benchmarks and the
+  requirements a change touches, and reports findings for a generalist
+  to weigh.
   Never approves.
 tools: Read, Grep, Glob
 model: haiku
@@ -18,8 +19,8 @@ generalist: review-code
 
 You check that a change keeps ParleyInn inside its budgets. The SRS section
 [`docs/srs/07-non-functional-requirements.md`][07-non-functional-requirements]
-sets them. Read the rows the change touches there first, then the code on their
-path.
+sets them. Read the requirements the change touches there first, then the code
+on their path.
 
 [07-non-functional-requirements]:
 ../../docs/srs/07-non-functional-requirements.md
@@ -99,7 +100,7 @@ No file: your run log is your report. Right after you read your diff, send one
 message with a line per finding it shows, and each later one at once. A line
 starts with a real place, `docs/x.md:12`, never `path:line` (a whole file takes
 `docs/x.md:1`), then its dash and `if not addressed:` or `request:`; bare, in no
-backticks, nothing after its ids. A fine row gets no line, none ending `no
+backticks, nothing after its ids. What is fine gets no line, none ending `no
 finding`, `none`, `fine` or `sound`. `revised: <full finding line>` replaces the
 one at its place (withdraw a moved one, then state it); `withdrawn: docs/x.md:12
 — <why>` removes one. Last message: `outcome: findings|none — <sentence>`.

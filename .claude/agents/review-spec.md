@@ -36,10 +36,11 @@ row: "- [`{name}`](../../docs/agents/{filename})"
 
 ## What you weigh
 
-- Does each touched row, its scenario and the scenario's bindings say
-  the same thing, and does a live step exercise its row's text?
+- Does each touched requirement, its scenario and the scenario's
+  bindings say the same thing, and does a live step exercise the
+  requirement's text?
 - Is every requirement id covered by exactly one scenario, with the
-  row's priority and invariants?
+  requirement's priority and invariants?
 - Does every name in the change come from the domain model, and does
   a new concept land in the model first?
 - Does a changed decision supersede its ADR rather than edit it

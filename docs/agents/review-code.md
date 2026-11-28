@@ -31,8 +31,8 @@ row: "- [`{name}`]({filename})"
 
 # What you weigh
 
-- Does the code do what each touched row says, and no more, and is
-  each behaviour proven at the lowest test layer that can prove it?
+- Does the code do what each touched requirement says, and no more, and
+  is each behaviour proven at the lowest test layer that can prove it?
 - Do errors keep their cause, blocking calls take a deadline, and I/O
   sit behind a seam a test injects
   ([ENG-03, ENG-04](../srs/10-engineering-quality.md))?
