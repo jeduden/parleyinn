@@ -132,7 +132,7 @@ MUST on a missing or malformed review outcome, deterministic findings, dispatch
 or credential; a review whose agents all ran MUST reach it as the outcome
 decided it, a range a specialist did not read, a line that does not read and a
 finding citing an id no requirement has among its blocking findings.
-A step that fails without deciding MUST post that check failed with its own
+That step, failing without deciding, MUST post that check failed with its own
 error in the summary, which MUST name each dispatched agent that did not run
 with the reason the review outcome gives, and, where a cost cap kept one from
 starting, what the pull request's reviews cost, the cap and how what they spent

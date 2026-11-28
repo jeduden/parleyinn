@@ -4,8 +4,8 @@ title: "A review a cost cap stopped says what to do"
 status: "✅"
 result: true
 summary: >-
-  ENG-28 now has a step that fails without deciding post the check
-  failed with its own error in the summary. The error names each
+  ENG-28 now has the step that posts, failing without deciding, post
+  the check failed with its own error in the summary. The error names each
   dispatched agent that did not run with the reason the review outcome
   gives. Where a cost cap kept one from starting, that holds what the
   pull request's reviews cost and the cap, and the error adds how what
