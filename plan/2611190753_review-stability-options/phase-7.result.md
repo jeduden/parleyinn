@@ -20,8 +20,11 @@ summary: >-
   lacks, in main's tree and in `pr-head/`.
 - An instruction file among them is in `pr-head/` alone and moves out
   as text, as the pull request's other instruction files do.
-- A link and a path that leaves the tree are left out, each named in
-  the run's notes.
+- A link, a path through a linked directory and a path that leaves the
+  tree are left out, each named in the run's notes. The local review of
+  the branch merged with main found the linked directory: a file
+  through one to outside the tree reached the world, and a unit test
+  that failed first now proves it stays out.
 - [docs/review-evaluation.md](../../docs/review-evaluation.md) says so
   where it describes the world.
 

@@ -105,6 +105,42 @@ fn an_added_path_that_is_no_regular_file_is_left_out_and_noted() {
     );
 }
 
+#[cfg(unix)]
+#[test]
+fn an_added_path_through_a_linked_directory_is_left_out_and_noted() {
+    let (dir, tree, main, pr_head) = trees();
+    write(dir.path(), "outside/secret.md", "token\n");
+    std::os::unix::fs::symlink(dir.path().join("outside"), tree.join("linked")).unwrap();
+    let mut host = FakeHost::new(&tree);
+    host.listing = Some(Ok("linked/secret.md\0".to_owned()));
+    let mut notes = Vec::new();
+
+    copy(&host, &tree, &main, &pr_head, &mut notes).unwrap();
+
+    assert!(!main.join("linked").exists() && !pr_head.join("linked").exists());
+    assert_eq!(
+        notes,
+        vec![
+            "left out linked/secret.md, which the evaluated tree adds: it is no regular file inside that tree"
+        ]
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn a_regular_file_is_one_reached_through_directories_alone() {
+    let (_dir, tree, _main, _pr_head) = trees();
+    write(&tree, "docs/a.md", "a\n");
+    std::os::unix::fs::symlink(tree.join("docs"), tree.join("linked")).unwrap();
+    std::os::unix::fs::symlink(tree.join("docs/a.md"), tree.join("b.md")).unwrap();
+
+    assert!(regular(&tree, Path::new("docs/a.md")));
+    assert!(regular(&tree, Path::new("kept.md")));
+    for rel in ["docs", "linked/a.md", "b.md", "gone.md", "kept.md/a.md"] {
+        assert!(!regular(&tree, Path::new(rel)), "{rel}");
+    }
+}
+
 #[test]
 fn an_added_path_that_leaves_the_tree_is_left_out_and_noted() {
     let (dir, tree, main, pr_head) = trees();

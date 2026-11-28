@@ -18,8 +18,8 @@ use crate::world::INSTRUCTION_NAMES;
 
 /// Copies each file the tree at `tree` tracks and `main` lacks into
 /// `pr_head`, and into `main` too unless it is an instruction file.
-/// One that is no regular file inside the tree is left out and named
-/// in `notes`.
+/// One that is no regular file inside the tree, a link or reached
+/// through one, is left out and named in `notes`.
 ///
 /// # Errors
 ///
@@ -39,13 +39,13 @@ pub fn copy(
         if inside && main.join(&rel).symlink_metadata().is_ok() {
             continue;
         }
-        let from = tree.join(&rel);
-        if !inside || !from.symlink_metadata().is_ok_and(|m| m.is_file()) {
+        if !inside || !regular(tree, Path::new(&rel)) {
             notes.push(format!(
                 "left out {rel}, which the evaluated tree adds: it is no regular file inside that tree"
             ));
             continue;
         }
+        let from = tree.join(&rel);
         place(&from, &rel, pr_head)?;
         if !instruction(&rel) {
             place(&from, &rel, main)?;
@@ -53,6 +53,20 @@ pub fn copy(
     }
 
     Ok(())
+}
+
+/// Whether `rel` names a regular file under `tree` that no link leads
+/// to: each directory on its way there is one, not a link to another.
+fn regular(tree: &Path, rel: &Path) -> bool {
+    let is = |path: &Path, kind: fn(&fs::Metadata) -> bool| {
+        tree.join(path).symlink_metadata().is_ok_and(|m| kind(&m))
+    };
+
+    is(rel, fs::Metadata::is_file)
+        && rel
+            .ancestors()
+            .skip(1)
+            .all(|dir| is(dir, fs::Metadata::is_dir))
 }
 
 /// The files git tracks in the tree at `tree`, relative to it.
