@@ -1,7 +1,7 @@
 //! Writes the review bundle the reviewing agent reads first: the review
 //! class, the deterministic findings and the record that satisfies
 //! ENG-29, the scenario backlog with the scenarios the pull request
-//! takes off `@pending`, and the rows, scenarios and invariants the
+//! takes off `@pending`, and the requirements, scenarios and invariants the
 //! change touches, each from main and, where it differs, from the pull
 //! request; and the small context each specialist reads in its place,
 //! which quotes the requirements its own files touch.
@@ -218,8 +218,8 @@ fn findings(b: &mut String, a: &Analysis) {
     }
 }
 
-/// Each touched id: its row and its scenario, from main and from the
-/// pull request where they differ.
+/// Each touched id: its requirement and its scenario, from main and
+/// from the pull request where they differ.
 fn touched(b: &mut String, a: &Analysis, base: &Snapshot, head: &Snapshot) {
     b.push_str("\n## Requirements this change touches\n");
     if a.touched.is_empty() {
@@ -227,19 +227,19 @@ fn touched(b: &mut String, a: &Analysis, base: &Snapshot, head: &Snapshot) {
     }
     for id in &a.touched {
         let _ = write!(b, "\n### {id}\n");
-        let row = |s: &Snapshot| s.requirements.iter().find(|r| &r.id == id).cloned();
-        match (a.requirements.get(id), row(base), row(head)) {
+        let defined = |s: &Snapshot| s.requirements.iter().find(|r| &r.id == id).cloned();
+        match (a.requirements.get(id), defined(base), defined(head)) {
             (Some(Change::Changed), Some(was), Some(is)) => {
                 requirement(b, "Main", &was);
                 requirement(b, "This pull request", &is);
             }
             (_, Some(was), None) => {
                 requirement(b, "Main", &was);
-                b.push_str("\nThis pull request removes the row.\n");
+                b.push_str("\nThis pull request removes the requirement.\n");
             }
             (_, None, Some(is)) => requirement(b, "This pull request adds", &is),
             (_, Some(was), Some(_)) => requirement(b, "Main", &was),
-            (_, None, None) => b.push_str("\nNo row defines it in either tree.\n"),
+            (_, None, None) => b.push_str("\nNeither tree defines it.\n"),
         }
         let scenario = |s: &Snapshot| s.scenarios.iter().find(|x| &x.id == id).cloned();
         match (a.scenarios.get(id), scenario(base), scenario(head)) {
@@ -259,9 +259,8 @@ fn touched(b: &mut String, a: &Analysis, base: &Snapshot, head: &Snapshot) {
 
 /// The requirements `files` touch ([`Analysis::named`]), each as the
 /// pull request has it, `head`, or as main has it, `base`, when the
-/// pull request removes it: a specialist reads its rows here, whole,
-/// and searches the specification for none, whose rows are lines too
-/// long for a search to show.
+/// pull request removes it: a specialist reads them here, whole, and
+/// searches the specification for none.
 fn own_requirements(
     b: &mut String,
     a: &Analysis,
@@ -278,14 +277,14 @@ fn own_requirements(
         b.push_str("\nNone.\n");
     }
     for id in ids {
-        let row = |s: &Snapshot| s.requirements.iter().find(|r| &r.id == id).cloned();
-        match (row(head), row(base)) {
+        let defined = |s: &Snapshot| s.requirements.iter().find(|r| &r.id == id).cloned();
+        match (defined(head), defined(base)) {
             (Some(is), _) => quoted(b, &is, ""),
             (None, Some(was)) => {
                 quoted(b, &was, " on main, which this pull request removes it from")
             }
             (None, None) => {
-                let _ = writeln!(b, "\n`{}`: no row defines it in either tree.", code(id));
+                let _ = writeln!(b, "\n`{}`: neither tree defines it.", code(id));
             }
         }
     }
@@ -335,7 +334,7 @@ fn sentences(text: &str) -> Vec<&str> {
     out
 }
 
-/// One requirement row under `label`.
+/// One requirement under `label`.
 fn requirement(b: &mut String, label: &str, r: &srs::Requirement) {
     let traces = if r.traces.is_empty() {
         "none".to_owned()

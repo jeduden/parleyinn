@@ -148,7 +148,7 @@ fn bundle_lists_stakeholder_paths_and_findings() {
 }
 
 #[test]
-fn bundle_shows_both_sides_of_a_changed_row_and_scenario() {
+fn bundle_shows_both_sides_of_a_changed_requirement_and_scenario() {
     let mut head = base();
     head.requirements[0].text = "Ingest all.".into();
     head.scenarios[0].steps.push("another step".into());
@@ -176,7 +176,7 @@ fn bundle_shows_both_sides_of_a_changed_row_and_scenario() {
 }
 
 #[test]
-fn bundle_shows_rows_and_scenarios_added_removed_or_only_named() {
+fn bundle_shows_requirements_and_scenarios_added_removed_or_only_named() {
     let mut head = base();
     head.requirements.remove(1);
     head.scenarios.remove(1);
@@ -188,7 +188,10 @@ fn bundle_shows_rows_and_scenarios_added_removed_or_only_named() {
     let got = bundle(&a, &base(), &head);
 
     assert!(got.contains("### REC-02\n\nMain"), "{got}");
-    assert!(got.contains("This pull request removes the row."), "{got}");
+    assert!(
+        got.contains("This pull request removes the requirement."),
+        "{got}"
+    );
     assert!(
         got.contains("This pull request removes the scenario."),
         "{got}"
@@ -206,9 +209,7 @@ fn bundle_shows_rows_and_scenarios_added_removed_or_only_named() {
         "{got}"
     );
     assert!(
-        got.contains(
-            "### REC-09\n\nNo row defines it in either tree.\n\nNo scenario carries it.\n"
-        ),
+        got.contains("### REC-09\n\nNeither tree defines it.\n\nNo scenario carries it.\n"),
         "{got}"
     );
 }
@@ -318,7 +319,7 @@ fn context_names_the_class_the_specialist_s_row_its_files_and_their_findings() {
     );
     assert!(
         !got.contains("REC-01 name"),
-        "the context quotes no row its files do not touch: {got}"
+        "the context quotes no requirement its files do not touch: {got}"
     );
 }
 
@@ -354,7 +355,7 @@ fn context_quotes_each_requirement_its_files_touch_one_sentence_per_line() {
 }
 
 #[test]
-fn context_quotes_a_row_the_pull_request_removes_as_main_has_it() {
+fn context_quotes_a_requirement_the_pull_request_removes_as_main_has_it() {
     let mut head = base();
     head.requirements.remove(1);
     let a = analyse(
@@ -376,7 +377,7 @@ fn context_quotes_a_row_the_pull_request_removes_as_main_has_it() {
 }
 
 #[test]
-fn context_says_when_no_row_defines_a_touched_id_its_files_touch() {
+fn context_says_when_neither_tree_defines_a_touched_id_its_files_touch() {
     let mut main = base();
     main.scenarios.push(sc("REC-09", false, &["a step"]));
     let mut head = main.clone();
@@ -391,9 +392,7 @@ fn context_says_when_no_row_defines_a_touched_id_its_files_touch() {
     let got = context(&a, &main, &head, "lang-gherkin");
 
     assert!(
-        got.contains(
-            "\n## Requirements your files touch\n\n`REC-09`: no row defines it in either tree.\n"
-        ),
+        got.contains("\n## Requirements your files touch\n\n`REC-09`: neither tree defines it.\n"),
         "{got}"
     );
 }

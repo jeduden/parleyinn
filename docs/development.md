@@ -203,8 +203,8 @@ tag. The stakeholder applies the rulesets on GitHub. The nightly
 or weaker. The workflow's token cannot see a ruleset's bypass actors. A code
 change, the gates and the security-sensitive crates included, lands on one
 approval from a reviewer other than its author, which an agent may give; the
-review class below keeps those deep. A change to an invariant, or to a row
-ENG-29 names, still needs a named human security reviewer's ADR (ENG-29).
+review class below keeps those deep. A change to an invariant or a requirement
+ENG-29 names still needs a named human security reviewer's ADR (ENG-29).
 
 [release.yml](../.github/workflows/release.yml) runs from the Actions
 "Run workflow" button on `main`, with a version like `v0.1.0`. A pushed
@@ -259,16 +259,16 @@ What CI decides, on every pull request:
 What `review-bundle` decides, comparing the pull request with main:
 
 - a scenario live on main deleted or put back on `@pending`: blocking;
-- an invariant, a row ENG-29 names or ENG-29's own row, changed without
-  both an accepted ADR in the same change that names ENG-29 and each
-  guarded id, and a comment of the stakeholder on the pull request:
+- an invariant, a requirement ENG-29 names or ENG-29 itself, changed
+  without both an accepted ADR in the same change that names ENG-29 and
+  each guarded id, and a comment of the stakeholder on the pull request:
   blocking;
 - a clippy ban lifted at a call site, or a diff header it cannot read:
   a nit, and an unread header makes the review deep.
 
 Code runs the review. The bundle dispatches, from the changed paths and touched
-rows, the low-effort specialists under [.claude/agents](../.claude/agents) and
-the medium-effort generalist each names, which weighs their findings.
+requirements, the low-effort specialists in [.claude/agents](../.claude/agents)
+and the medium-effort generalist each names, which weighs their findings.
 `review-run` runs every specialist, then every generalist, each on its own
 model, and approves only when every agent answered readably and none blocks.
 The gate fails a review whose consulted list lacks a dispatched agent.
@@ -278,7 +278,7 @@ template under [docs/agents](agents/review-code.md), on the model, effort and
 turns its definition names. The class is light for other Markdown, and deep for
 the stakeholder's paths, the SRS, the ADRs, the scenarios, the configuration,
 the gates and the security-sensitive code. The bundle quotes only the touched
-rows, their scenarios and the invariants, a few thousand model tokens where the
+requirements, scenarios and invariants, a few thousand model tokens where the
 SRS runs to hundreds of thousands. The pull request's agent instructions leave
 the agents' directory, so none loads; they are read as data. The posted review
 names the gate as its author, states the review's verdict, and keeps the agents'
@@ -288,7 +288,7 @@ evaluation cases, whose failures are blocking findings (ENG-32,
 [review-evaluation.md](review-evaluation.md)).
 
 What is left to the agent is judgement: whether the code and the step
-bindings do what each touched row says, new paths to the model (I2),
+bindings do what each touched requirement says, new paths to the model (I2),
 new reach (I4), content of another principal (I8), errors and seams
 no lint sees, and the domain model's terms. Persona reviews belong to
 plans and SRS changes (the `persona-review` skill), not to each pull

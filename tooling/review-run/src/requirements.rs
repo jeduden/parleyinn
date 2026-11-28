@@ -2,8 +2,8 @@
 //! the SRS defines in main's tree or in the pull request's, so a change
 //! that adds a requirement can cite it and one that removes a
 //! requirement still lets a finding name it, and the invariants. A
-//! tree with no `docs/srs` adds no id; one whose tables do not read
-//! fails the review before any agent runs.
+//! tree with no `docs/srs` adds no id; one whose requirements do not
+//! read fails the review before any agent runs.
 
 use std::collections::BTreeSet;
 use std::path::Path;

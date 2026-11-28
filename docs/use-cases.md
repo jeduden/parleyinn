@@ -10,7 +10,7 @@ summary: >-
 This index collects use cases the SRS does not cover yet, so that none
 of them lives only in a chat. It is not normative: the SRS decides what
 ParleyInn does. When a plan takes an entry up, it lands as a domain-model
-concept, requirement rows and `@pending` scenarios, and its entry then
+concept, requirements and `@pending` scenarios, and its entry then
 names those requirement ids.
 
 ## Format

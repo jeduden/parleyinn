@@ -1,7 +1,7 @@
 //! The ENG-34 steps: the review bundle flags, with no agent, a changed
 //! file past its kind's line limit and a changed file no review
 //! specialist reads, each a nit in the finding form, and its limits are
-//! those the ENG-34 row states.
+//! those ENG-34 states.
 
 use cucumber::{then, when};
 use engineering::file_sizes;
@@ -19,9 +19,11 @@ struct Read {
     sizes: Vec<String>,
 }
 
-#[then(regex = r"^the review bundle's line limits are those the ENG-34 row states$")]
-fn limits_match_the_row(w: &mut World) -> Result<(), String> {
-    outcome(review_limits::limits_match_the_row(eng(w).checkout()?))
+#[then(regex = r"^the review bundle's line limits are those ENG-34 states$")]
+fn limits_match_the_requirement(w: &mut World) -> Result<(), String> {
+    outcome(review_limits::limits_match_the_requirement(
+        eng(w).checkout()?,
+    ))
 }
 
 /// Runs the review bundle on a change that adds `files`.
@@ -60,7 +62,7 @@ fn nit_at_the_rust_file(w: &mut World) -> Result<(), String> {
     outcome(review_limits::nit_at(
         &built(w)?,
         OVERSIZE,
-        review_limits::ROW,
+        review_limits::LIMITS_ID,
     ))
 }
 

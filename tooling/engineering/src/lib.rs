@@ -36,6 +36,7 @@ pub mod review_languages;
 pub mod review_leak;
 pub mod review_limits;
 pub mod review_logs;
+pub mod review_merge;
 pub mod review_parts;
 pub mod review_previous;
 pub mod review_refusals;
@@ -117,12 +118,12 @@ impl Checkout {
         }
     }
 
-    /// Reads one requirement row from the checkout's SRS, so a scenario
-    /// checks the row's own words rather than a copy of them.
+    /// Reads one requirement from the checkout's SRS, so a scenario
+    /// checks the requirement's own words rather than a copy of them.
     ///
     /// # Errors
     ///
-    /// Fails when the SRS cannot be read or has no such row.
+    /// Fails when the SRS cannot be read or has no such requirement.
     pub fn requirement(&self, id: &str) -> Result<srs::Requirement, String> {
         srs::load(&self.root.join("docs/srs"))
             .map_err(|e| e.to_string())?

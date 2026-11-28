@@ -20,8 +20,8 @@ summary: >-
   `<file>:<line>: a requirement table: write each requirement as a
   block under a heading that is its id`, at the header's line. Every
   other table, and one quoted in a code fence, is passed by. The row
-  reader is gone, and the crate's stated responsibility says it reads
-  blocks and refuses a row.
+  reader is gone, and the crate's doc says it reads blocks and refuses
+  a row. Its manifest's stated responsibility changes in phase 16.
 - Every test that writes an SRS to disk writes its requirements as
   blocks: the engineering crate's, the review bundle's, the
   evaluation's and review-run's. A test of an SRS that does not read

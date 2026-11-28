@@ -8,6 +8,7 @@ mod ci;
 mod ci_gates;
 mod context;
 mod file_sizes;
+mod merged_head;
 mod previous;
 mod records;
 mod release;
@@ -177,7 +178,7 @@ pub fn cases() -> Vec<Case> {
 /// adding one moves no earlier case to another shard.
 fn late_cases() -> Vec<Case> {
     [
-        eng_29_row_cases(),
+        eng_29_requirement_cases(),
         review_logs::review_reading_cases(),
         context::review_consent_cases(),
         context::review_quote_cases(),
@@ -189,6 +190,7 @@ fn late_cases() -> Vec<Case> {
         coverage_list_cases(),
         tool_list_cases(),
         table_parse_cases(),
+        merged_head::review_merged_head_cases(),
     ]
     .concat()
 }

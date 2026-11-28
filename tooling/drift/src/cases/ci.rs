@@ -197,8 +197,8 @@ pub(super) fn static_analysis_cases() -> Vec<Case> {
 }
 
 /// The drifts ENG-11's checks exist to catch: a security-sensitive
-/// crate held below the row's floor, and CI no longer merging the
-/// layers' profiles against the floors.
+/// crate held below the floor ENG-11 states, and CI no longer merging
+/// the layers' profiles against the floors.
 pub(super) fn coverage_floor_cases() -> Vec<Case> {
     vec![
         case(

@@ -1,10 +1,10 @@
 Feature: Assumptions register (ASM)
 
   The scenarios for SRS §2.3, one per assumption, tagged with its id. The
-  rows carry neither priority nor traces, so a scenario here carries
-  its id alone. Each is a contract test (ENG-17) that replays hook
-  inputs and transcripts recorded from Claude Code by the M0 spike
-  named in the row's "Verified in" column, and is re-run against every
+  assumptions carry neither priority nor traces, so a scenario here
+  carries its id alone. Each is a contract test (ENG-17) that replays
+  hook inputs and transcripts recorded from Claude Code by the M0 spike
+  named in the assumption's "Verified in" field, and is re-run against every
   supported Claude Code release. A scenario still tagged @pending is
   declared but not yet written: its steps are bound when the spike's
   recorded fixtures land.
