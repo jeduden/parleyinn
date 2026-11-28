@@ -78,10 +78,10 @@ flag per layer. Codecov's [thresholds](../codecov.yml) are a soft ratchet.
 
 The SRS under [docs/srs](srs/index.md) is executable. Every requirement, from
 `REC-01` to `ENG-35`, and every assumption `ASM-`, has exactly one Gherkin
-scenario under `features/`, one file per SRS section. A requirement is a row of
-its section's table, or a block: a heading that is its id, its fields as a list,
-then its text, one sentence a line, a shape mdsmith checks. The scenario carries
-the id, the priority and the traced invariants as tags:
+scenario under `features/`, one file per SRS section. A requirement is a block:
+a heading that is its id, its fields as a list, then its text, one sentence a
+line, a shape mdsmith checks; the srs parser refuses a requirement table. The
+scenario carries the id, the priority and the traced invariants as tags:
 
 ```gherkin
 @REC-03 @P0 @I1 @I10 @pending

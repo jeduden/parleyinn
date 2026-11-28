@@ -102,8 +102,8 @@ fn in_appendix_b(id: &str) -> bool {
         .any(|family| id.starts_with(family))
 }
 
-/// Counts requirements by priority. NFR and ASM rows carry no priority
-/// and are not counted.
+/// Counts requirements by priority. NFR and ASM requirements carry no
+/// priority and are not counted.
 #[must_use]
 pub fn priority_counts(reqs: &[Requirement]) -> Counts {
     let mut out = Counts::default();

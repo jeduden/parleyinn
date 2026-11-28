@@ -2,8 +2,8 @@
 //! crates and 80% overall. The `coverage` crate measures every test
 //! layer and fails CI when a crate falls below its floor in
 //! `[workspace.metadata.coverage]`. These checks hold the profile CI
-//! takes to the row's words: each security-sensitive crate the
-//! workspace builds is held to at least the row's floor over every test
+//! takes to ENG-11's words: each security-sensitive crate the
+//! workspace builds is held to at least its floor over every test
 //! layer, every crate to at least the overall one (so the whole
 //! workspace, a sum of its crates, is too), and the CI job that merges
 //! the layers is one the `CI` check needs.
@@ -22,10 +22,10 @@ pub const MERGE: &str = "-p coverage -- --merge";
 /// The job every other job joins.
 const AGGREGATOR: &str = "ci";
 
-/// What the ENG-11 row says.
+/// What ENG-11 states: the security-sensitive crates and both floors.
 #[derive(Debug, Clone, PartialEq)]
-pub struct Row {
-    /// The security-sensitive crates, in the row's order.
+pub struct Stated {
+    /// The security-sensitive crates, in ENG-11's order.
     pub sensitive: Vec<String>,
     /// Their floor, in percent of lines.
     pub sensitive_floor: f64,
@@ -39,8 +39,8 @@ const SENSITIVE: &str = "for security-sensitive crates";
 /// The word the overall floor ends with.
 const OVERALL: &str = "overall";
 
-impl Row {
-    /// Reads the row's text.
+impl Stated {
+    /// Reads ENG-11's text.
     ///
     /// # Errors
     ///
@@ -50,9 +50,7 @@ impl Row {
         let (before, rest) = text.split_once(SENSITIVE).unwrap_or((text, ""));
         let list = rest.split_once('(').and_then(|(_, l)| l.split_once(')'));
         let Some((list, after)) = list else {
-            return Err(
-                "the ENG-11 row names no security-sensitive crates in parentheses".to_owned(),
-            );
+            return Err("ENG-11 names no security-sensitive crates in parentheses".to_owned());
         };
         let sensitive = list
             .split(',')
@@ -60,11 +58,11 @@ impl Row {
             .filter(|c| !c.is_empty())
             .collect();
         let sensitive_floor = last_percent(before)
-            .ok_or_else(|| format!("the ENG-11 row states no floor before {SENSITIVE:?}"))?;
+            .ok_or_else(|| format!("ENG-11 states no floor before {SENSITIVE:?}"))?;
         let overall_floor = after
             .split_once(OVERALL)
             .and_then(|(b, _)| last_percent(b))
-            .ok_or_else(|| format!("the ENG-11 row states no floor before {OVERALL:?}"))?;
+            .ok_or_else(|| format!("ENG-11 states no floor before {OVERALL:?}"))?;
 
         Ok(Self {
             sensitive,
@@ -84,10 +82,11 @@ fn last_percent(text: &str) -> Option<f64> {
 }
 
 /// The security-sensitive crates the workspace builds, and those it does
-/// not build yet, each in the row's order.
+/// not build yet, each in ENG-11's order.
 #[must_use]
-pub fn built(plan: &Plan, row: &Row) -> (Vec<String>, Vec<String>) {
-    row.sensitive
+pub fn built(plan: &Plan, stated: &Stated) -> (Vec<String>, Vec<String>) {
+    stated
+        .sensitive
         .iter()
         .cloned()
         .partition(|name| plan.crates.iter().any(|c| &c.name == name))
@@ -106,23 +105,23 @@ fn short_of(plan: &Plan, name: &str, floor: f64, overall: &str) -> Option<String
 }
 
 /// The security-sensitive crates the workspace builds that are held to
-/// less than the row's floor.
+/// less than ENG-11's floor for them.
 #[must_use]
-pub fn sensitive_problems(plan: &Plan, row: &Row) -> Vec<String> {
-    built(plan, row)
+pub fn sensitive_problems(plan: &Plan, stated: &Stated) -> Vec<String> {
+    built(plan, stated)
         .0
         .iter()
-        .filter_map(|name| short_of(plan, name, row.sensitive_floor, ""))
+        .filter_map(|name| short_of(plan, name, stated.sensitive_floor, ""))
         .collect()
 }
 
 /// The crates held to less than the overall floor: while there is none,
 /// the workspace, whose lines are its crates' lines, is held to it too.
 #[must_use]
-pub fn overall_problems(plan: &Plan, row: &Row) -> Vec<String> {
+pub fn overall_problems(plan: &Plan, stated: &Stated) -> Vec<String> {
     plan.crates
         .iter()
-        .filter_map(|c| short_of(plan, &c.name, row.overall_floor, " overall"))
+        .filter_map(|c| short_of(plan, &c.name, stated.overall_floor, " overall"))
         .collect()
 }
 

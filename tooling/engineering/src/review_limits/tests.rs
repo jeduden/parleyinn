@@ -1,6 +1,6 @@
 use super::*;
 
-const ROW_TEXT: &str = "MUST flag: 1000 for Rust (`.rs`), 500 for Gherkin (`.feature`), \
+const ENG_34: &str = "MUST flag: 1000 for Rust (`.rs`), 500 for Gherkin (`.feature`), \
                         500 for YAML (`.yml`, `.yaml`), 200 for TOML (`.toml`) and 200 for \
                         shell (`.sh`); a file for review is no limit.";
 
@@ -24,9 +24,9 @@ fn built(checked: Vec<Nit>, bundle: &str) -> Built {
 }
 
 #[test]
-fn the_row_s_limits_read_by_kind() {
+fn the_requirement_s_limits_read_by_kind() {
     assert_eq!(
-        stated_limits(ROW_TEXT),
+        stated_limits(ENG_34),
         vec![
             ("Rust".to_owned(), 1000),
             ("Gherkin".to_owned(), 500),
@@ -39,35 +39,38 @@ fn the_row_s_limits_read_by_kind() {
 }
 
 #[test]
-fn limits_that_match_the_row_pass() {
-    assert!(limits_match(ROW_TEXT).is_empty());
+fn limits_that_match_the_requirement_pass() {
+    assert!(limits_match(ENG_34).is_empty());
 }
 
 #[test]
-fn a_limit_the_row_and_the_bundle_disagree_on_is_named_both_ways() {
-    let text = ROW_TEXT.replace("200 for TOML", "250 for TOML");
+fn a_limit_the_requirement_and_the_bundle_disagree_on_is_named_both_ways() {
+    let text = ENG_34.replace("200 for TOML", "250 for TOML");
 
     assert_eq!(
         limits_match(&text),
         vec![
-            "the ENG-34 row states no limit of 200 for TOML, which the review bundle holds",
-            "the review bundle holds no limit of 250 for TOML, which the ENG-34 row states",
+            "ENG-34 states no limit of 200 for TOML, which the review bundle holds",
+            "the review bundle holds no limit of 250 for TOML, which ENG-34 states",
         ]
     );
 }
 
 #[test]
-fn the_checkout_s_row_is_read() {
-    let (_d, c) = crate::tests::checkout(&[("docs/srs/10.md", &srs_with(ROW_TEXT))]);
+fn the_checkout_s_requirement_is_read() {
+    let (_d, c) = crate::tests::checkout(&[("docs/srs/10.md", &srs_with(ENG_34))]);
 
-    assert!(limits_match_the_row(&c).is_empty());
+    assert!(limits_match_the_requirement(&c).is_empty());
 }
 
 #[test]
-fn a_missing_row_is_named() {
+fn a_missing_requirement_is_named() {
     let (_d, c) = crate::tests::checkout(&[("docs/srs/10.md", "# 10\n")]);
 
-    assert_eq!(limits_match_the_row(&c), vec!["no ENG-34 row in docs/srs"]);
+    assert_eq!(
+        limits_match_the_requirement(&c),
+        vec!["no requirement ENG-34 in docs/srs"]
+    );
 }
 
 #[test]
@@ -76,7 +79,7 @@ fn an_srs_that_does_not_read_is_named() {
     let want = srs::load(&c.root.join("docs/srs")).unwrap_err();
 
     assert_eq!(
-        limits_match_the_row(&c),
+        limits_match_the_requirement(&c),
         vec![format!("read docs/srs: {want}")]
     );
 }

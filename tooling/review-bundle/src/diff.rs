@@ -201,7 +201,7 @@ pub fn mentioned_ids(diff: &str) -> Vec<String> {
 
 /// Every requirement id an added or removed line of a file other than
 /// Markdown or a test names, sorted and each once: code and
-/// configuration that name a row, not prose that quotes one or a test
+/// configuration that name a requirement, not prose that quotes one or a test
 /// that takes one as its data. Lines before any header belong to no
 /// file and are left out.
 #[must_use]

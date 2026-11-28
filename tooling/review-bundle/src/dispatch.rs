@@ -1,5 +1,5 @@
 //! Which agents the review runs (ENG-28): from the paths a pull
-//! request changes and the requirement rows it touches, the low-effort
+//! request changes and the requirements it touches, the low-effort
 //! specialists that read them, grouped under the medium-effort
 //! generalist that weighs their findings. It is a pure function of its
 //! inputs: `review-run` runs every agent it names, and the review gate
@@ -105,12 +105,12 @@ pub const MODEL_HUB: &str = "domain-model-hub";
 const INVARIANTS: &str = "docs/srs/invariants.md";
 /// The officer every security-relevant change consults.
 const OFFICER: &str = "persona-security-officer";
-/// The invariants whose rows reach the security generalist.
+/// The invariants whose requirements reach the security generalist.
 const SECURITY_INVARIANTS: [&str; 4] = ["I2", "I4", "I6", "I8"];
 /// The test, within a crate, that refuses a crate linked into it.
 const REACH_TEST: &str = "tests/reach.rs";
 /// The security-sensitive crate name that stands for every crate, for
-/// when main's ENG-11 row names none the analysis can read.
+/// when main's ENG-11 names none the analysis can read.
 pub const EVERY_CRATE: &str = "*";
 
 /// The generalist that weighs `specialist`'s findings, the single source
@@ -181,27 +181,32 @@ fn agent_name(name: &str) -> Option<String> {
     is_agent_name(name).then(|| name.to_owned())
 }
 
-/// The agents to consult for `paths`, the changed paths, and `rows`,
-/// the requirement rows the change touches; `security_crates` are the
-/// crates ENG-11 names.
+/// The agents to consult for `paths`, the changed paths, and
+/// `requirements`, the requirements the change touches;
+/// `security_crates` are the crates ENG-11 names.
 #[must_use]
 pub fn dispatch(
     paths: &[String],
-    rows: &[&srs::Requirement],
+    requirements: &[&srs::Requirement],
     security_crates: &[String],
 ) -> Dispatch {
-    grouped(&scopes(paths, rows, security_crates, &BTreeMap::new()))
+    grouped(&scopes(
+        paths,
+        requirements,
+        security_crates,
+        &BTreeMap::new(),
+    ))
 }
 
 /// Each specialist to consult, with the changed files it reads: those
-/// of `paths` that bring it, and for a specialist one of `rows` brings,
-/// that row's own file among `paths` and every file `naming`, each
-/// file's ids, says names the row. A specialist a row brings with no
-/// such file reads none.
+/// of `paths` that bring it, and for a specialist one of `requirements`
+/// brings, that requirement's own file among `paths` and every file
+/// `naming`, each file's ids, says names it. A specialist a requirement
+/// brings with no such file reads none.
 #[must_use]
 pub fn scopes(
     paths: &[String],
-    rows: &[&srs::Requirement],
+    requirements: &[&srs::Requirement],
     security_crates: &[String],
     naming: &BTreeMap<String, BTreeSet<String>>,
 ) -> Scopes {
@@ -218,29 +223,31 @@ pub fn scopes(
             add(&specialist, &mut std::iter::once(path));
         }
     }
-    for row in rows {
-        let own = row.path.to_str().unwrap_or_default();
+    for requirement in requirements {
+        let own = requirement.path.to_str().unwrap_or_default();
         let files: Vec<&String> = paths
             .iter()
             .filter(|p| p.as_str() == own)
             .chain(
                 naming
                     .iter()
-                    .filter(|(_, ids)| ids.contains(&row.id))
+                    .filter(|(_, ids)| ids.contains(&requirement.id))
                     .map(|(f, _)| f),
             )
             .collect();
-        if let Some(section) = row.path.to_str().and_then(section_specialist) {
+        if let Some(section) = requirement.path.to_str().and_then(section_specialist) {
             add(&section, &mut files.iter().copied());
         }
-        if row
+        if requirement
             .traces
             .iter()
             .any(|t| SECURITY_INVARIANTS.contains(&t.as_str()))
         {
             add(OFFICER, &mut files.iter().copied());
         }
-        if row.id.starts_with(NON_FUNCTIONAL) || row.traces.iter().any(|t| t == NEVER_DEGRADES) {
+        if requirement.id.starts_with(NON_FUNCTIONAL)
+            || requirement.traces.iter().any(|t| t == NEVER_DEGRADES)
+        {
             add(PERFORMANCE, &mut files.iter().copied());
         }
     }

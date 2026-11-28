@@ -111,12 +111,12 @@ fn the_specification_and_the_model_route_to_spec() {
 }
 
 #[test]
-fn touched_rows_bring_their_section_and_security_their_officer() {
-    let rows = [
+fn touched_requirements_bring_their_section_and_security_their_officer() {
+    let requirements = [
         req("REC-01", "docs/srs/05-functional-requirements.md", &["I1"]),
         req("SEC-01", "docs/srs/06-security.md", &["I4"]),
     ];
-    let got = dispatch(&[], &rows.iter().collect::<Vec<_>>(), &[]);
+    let got = dispatch(&[], &requirements.iter().collect::<Vec<_>>(), &[]);
 
     assert_eq!(
         got[SPEC],
@@ -125,8 +125,8 @@ fn touched_rows_bring_their_section_and_security_their_officer() {
     assert_eq!(got[SECURITY], names(&["persona-security-officer"]));
 
     for invariant in ["I2", "I6", "I8"] {
-        let row = req("X-01", "docs/srs/index.md", &[invariant]);
-        let got = dispatch(&[], &[&row], &[]);
+        let requirement = req("X-01", "docs/srs/index.md", &[invariant]);
+        let got = dispatch(&[], &[&requirement], &[]);
         assert_eq!(
             got[SECURITY],
             names(&["persona-security-officer"]),
@@ -293,13 +293,13 @@ fn product_code_and_the_benchmarks_bring_the_performance_specialist() {
 }
 
 #[test]
-fn a_non_functional_row_or_one_tracing_i9_brings_the_performance_specialist() {
-    for row in [
+fn a_non_functional_requirement_or_one_tracing_i9_brings_the_performance_specialist() {
+    for requirement in [
         req("NFR-01", "docs/srs/07-non-functional-requirements.md", &[]),
         req("HOOK-01", "docs/srs/05-functional-requirements.md", &["I9"]),
     ] {
-        let got = dispatch(&[], &[&row], &[]);
-        assert_eq!(got[CODE], names(&[PERFORMANCE]), "{}", row.id);
+        let got = dispatch(&[], &[&requirement], &[]);
+        assert_eq!(got[CODE], names(&[PERFORMANCE]), "{}", requirement.id);
     }
 }
 
@@ -357,18 +357,23 @@ fn a_deep_review_hands_each_generalist_s_specialists_to_its_deep_instance() {
 }
 
 #[test]
-fn scopes_name_each_specialist_s_files_by_path_and_by_the_rows_they_name() {
+fn scopes_name_each_specialist_s_files_by_path_and_by_the_requirements_they_name() {
     let paths: Vec<String> = ["crates/pin/src/lib.rs", "docs/srs/06-security.md", "x.txt"]
         .map(str::to_owned)
         .into();
-    let row = req("SEC-01", "docs/srs/06-security.md", &["I4"]);
+    let requirement = req("SEC-01", "docs/srs/06-security.md", &["I4"]);
     let quiet = req("REC-01", "docs/srs/05-functional-requirements.md", &[]);
     let naming = BTreeMap::from([
         ("crates/pin/src/lib.rs".to_owned(), names(&["SEC-01"])),
         ("x.txt".to_owned(), names(&["REC-02"])),
     ]);
 
-    let got = scopes(&paths, &[&row, &quiet], &["pin".to_owned()], &naming);
+    let got = scopes(
+        &paths,
+        &[&requirement, &quiet],
+        &["pin".to_owned()],
+        &naming,
+    );
 
     assert_eq!(got["lang-rust"], names(&["crates/pin/src/lib.rs"]));
     assert_eq!(
@@ -383,7 +388,7 @@ fn scopes_name_each_specialist_s_files_by_path_and_by_the_rows_they_name() {
     assert!(got.keys().all(|s| generalist_of(s).is_some()), "{got:?}");
     assert_eq!(
         grouped(&got),
-        dispatch(&paths, &[&row, &quiet], &["pin".to_owned()])
+        dispatch(&paths, &[&requirement, &quiet], &["pin".to_owned()])
     );
 }
 

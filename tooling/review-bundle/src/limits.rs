@@ -3,8 +3,8 @@
 //! past its kind's line limit is a nit, and so is a changed file no
 //! review specialist reads, which reaches only a generalist: the review
 //! is honest about what it did not read. Neither restricts what the
-//! review reads; the generalists weigh both, and only the ENG-34 row
-//! sets a limit.
+//! review reads; the generalists weigh both, and only ENG-34 sets a
+//! limit.
 
 use std::path::Path;
 

@@ -4,7 +4,7 @@ use testkit::TempDir;
 
 use super::*;
 
-const SECTION: &str = "---\ntitle: \"6. Security\"\n---\n# 6. Security\n\nProse.\n\n| ID | Pri | Requirement | Ver | Traces |\n|---|---|---|---|---|\n| SEC-01 | P0 | The core opens no socket. | T | I4 |\n";
+const SECTION: &str = "---\ntitle: \"6. Security\"\n---\n# 6. Security\n\nProse.\n\n## SEC-01\n\n- Pri: P0\n- Ver: T\n- Traces: I4\n\nThe core opens\nno socket.\n\n";
 
 fn tree() -> TempDir {
     let dir = TempDir::new().unwrap();
@@ -51,49 +51,17 @@ fn every_section_and_model_file_gets_its_three_cases() {
             "srs-rationale/defect-excluded-terms",
             "srs-rationale/injection-comment",
             "srs-security/clean-sentence",
-            "srs-security/defect-row-without-scenario",
+            "srs-security/defect-requirement-without-scenario",
             "srs-security/injection-comment",
         ]
     );
     for case in &got {
         assert_eq!(case.validate(dir.path()), Ok(()), "{}", case.id());
         assert!(["defect", "clean", "injection"].contains(&case.kind.as_str()));
-        // A specialist looks a row, a scenario or a concept up beyond its
+        // A specialist looks a requirement, a scenario or a concept up beyond its
         // diff, and the pull request's tree is where it is to look.
         assert!(case.expect.main_unread, "{}", case.id());
     }
-}
-
-#[test]
-fn a_row_defect_adds_a_must_to_the_first_row_and_expects_a_blocking_finding() {
-    let dir = tree();
-
-    let got = cases(dir.path()).unwrap();
-    let case = got
-        .iter()
-        .find(|c| c.id() == "srs-security/defect-row-without-scenario")
-        .unwrap();
-
-    assert_eq!(
-        case.title,
-        "a MUST added to SEC-01 with no change to its scenario"
-    );
-    let [Edit::Replace { file, old, new }] = case.edits.as_slice() else {
-        panic!("{:?}", case.edits);
-    };
-    assert_eq!(file, "docs/srs/06-security.md");
-    assert_eq!(
-        old,
-        "| SEC-01 | P0 | The core opens no socket. | T | I4 |\n"
-    );
-    assert_eq!(
-        new,
-        "| SEC-01 | P0 | The core opens no socket. It MUST also record the change in the audit log. | T | I4 |\n"
-    );
-    assert_eq!(case.expect.outcome, vec!["findings"]);
-    assert_eq!(case.expect.finding[0].ids, vec!["SEC-01"]);
-    assert_eq!(case.expect.finding[0].form.as_deref(), Some("linked"));
-    assert_eq!(case.expect.finding[0].severity, None);
 }
 
 #[test]
@@ -232,7 +200,7 @@ fn an_unreadable_file_is_named() {
 }
 
 #[test]
-fn ids_and_rows_are_recognised_strictly() {
+fn ids_are_recognised_strictly() {
     assert!(srs_id("SEC-01"));
     assert!(srs_id("LANE-123"));
     assert!(!srs_id("I2"));
@@ -245,17 +213,6 @@ fn ids_and_rows_are_recognised_strictly() {
         Some("REC-01".to_owned())
     );
     assert_eq!(first_requirement_id("nothing"), None);
-    assert_eq!(
-        first_row("| ID | Pri | Requirement | Ver |\n| x | y | z | w |\n"),
-        None
-    );
-    assert_eq!(
-        first_row("| ENG-01 | P0  | Pins. | T    |\n"),
-        Some((
-            "| ENG-01 | P0  | Pins. | T    |\n".to_owned(),
-            "ENG-01".to_owned()
-        ))
-    );
 }
 
 #[test]
@@ -328,32 +285,13 @@ fn the_invariants_consent_names_every_stakeholder_path_its_case_changes() {
 }
 
 #[test]
-fn an_open_question_s_row_is_no_requirement_row() {
-    // A linked finding ends with requirement ids, and an open question's
-    // is refused among them, so a MUST added to its row has no right
-    // answer in that form.
-    let question = "| OQ-09 | P1 | Which licence? | the stakeholder |\n";
-    let requirement = "| SEC-01 | P0 | It MUST refuse. | T |\n";
-
-    assert_eq!(first_row(question), None);
-    assert_eq!(
-        first_row(&format!("{question}{requirement}")),
-        Some((requirement.to_owned(), "SEC-01".to_owned()))
-    );
-}
-
-/// The security section of [`SECTION`] with its row written as a block.
-const BLOCK_SECTION: &str = "---\ntitle: \"6. Security\"\n---\n# 6. Security\n\nProse.\n\n## SEC-01\n\n- Pri: P0\n- Ver: T\n- Traces: I4\n\nThe core opens\nno socket.\n\n";
-
-#[test]
-fn a_block_defect_adds_a_must_on_a_line_of_its_own_after_the_block_s_text() {
+fn a_defect_adds_a_must_after_the_first_block_s_text_and_expects_a_linked_finding() {
     let dir = tree();
-    fs::write(dir.path().join("docs/srs/06-security.md"), BLOCK_SECTION).unwrap();
 
     let got = cases(dir.path()).unwrap();
     let case = got
         .iter()
-        .find(|c| c.id() == "srs-security/defect-row-without-scenario")
+        .find(|c| c.id() == "srs-security/defect-requirement-without-scenario")
         .unwrap();
 
     assert_eq!(
@@ -371,7 +309,10 @@ fn a_block_defect_adds_a_must_on_a_line_of_its_own_after_the_block_s_text() {
         &format!("{block}It MUST also record the change in the audit log.\n")
     );
     assert_eq!(case.validate(dir.path()), Ok(()));
+    assert_eq!(case.expect.outcome, vec!["findings"]);
     assert_eq!(case.expect.finding[0].ids, vec!["SEC-01"]);
+    assert_eq!(case.expect.finding[0].form.as_deref(), Some("linked"));
+    assert_eq!(case.expect.finding[0].severity, None);
 }
 
 #[test]
@@ -391,8 +332,8 @@ fn a_block_is_a_requirement_with_a_priority_up_to_its_next_heading_or_table() {
         first_block(piped),
         Some((piped.to_owned(), "SEC-03".to_owned()))
     );
-    // An assumption or a non-functional requirement carries no priority,
-    // as its row carries none, and an open question is no requirement.
+    // An assumption or a non-functional requirement carries no priority
+    // field, and an open question is no requirement.
     assert_eq!(
         first_block("## ASM-01\n\n- Verified in: S1\n\nHooks.\n"),
         None
@@ -407,33 +348,15 @@ fn a_block_is_a_requirement_with_a_priority_up_to_its_next_heading_or_table() {
 }
 
 #[test]
-fn the_first_requirement_is_the_earlier_of_a_row_and_a_block() {
-    let row = "| SEC-01 | P0 | The core opens no socket. | T | I4 |\n";
-    let block = "## SEC-02\n\n- Pri: P1\n\nIt MUST refuse.\n";
-
-    let ids = |text: &str| first_requirement(text).map(|(_, _, id)| id);
-
-    assert_eq!(ids(&format!("{block}\n{row}")), Some("SEC-02".to_owned()));
-    assert_eq!(ids(&format!("{row}\n{block}")), Some("SEC-01".to_owned()));
-    assert_eq!(ids("# Nothing\n"), None);
-}
-
-#[test]
 fn a_requirement_inside_a_code_fence_is_none() {
     let fence = "````markdown\n```\n## SEC-09\n\n- Pri: P2\n\nAn example.\n\n\
                  | SEC-08 | P2 | An example. | T | I4 |\n```\n````\n\n";
     let block = "## SEC-02\n\n- Pri: P1\n\nIt MUST refuse.\n";
-    let row = "| SEC-01 | P0 | The core opens no socket. | T | I4 |\n";
 
     assert_eq!(first_block(fence), None);
-    assert_eq!(first_row(fence), None);
     assert_eq!(
         first_block(&format!("{fence}{block}")),
         Some((block.to_owned(), "SEC-02".to_owned()))
-    );
-    assert_eq!(
-        first_row(&format!("{fence}{row}")),
-        Some((row.to_owned(), "SEC-01".to_owned()))
     );
 }
 

@@ -177,7 +177,7 @@ pub fn cases() -> Vec<Case> {
 /// adding one moves no earlier case to another shard.
 fn late_cases() -> Vec<Case> {
     [
-        eng_29_row_cases(),
+        eng_29_requirement_cases(),
         review_logs::review_reading_cases(),
         context::review_consent_cases(),
         context::review_quote_cases(),

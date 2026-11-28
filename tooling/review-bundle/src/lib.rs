@@ -1,5 +1,5 @@
 //! Builds what the review workflow hands the reviewing agent, before it
-//! runs (ENG-21, ENG-28): a review bundle of only the requirement rows,
+//! runs (ENG-21, ENG-28): a review bundle of only the requirements,
 //! scenarios and invariants the pull request touches, so the agent
 //! reads a few thousand model tokens instead of browsing the SRS; the
 //! review class that sets how deep the review goes; and the findings deterministic

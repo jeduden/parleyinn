@@ -9,8 +9,8 @@ use crate::Scenario;
 ///
 /// - every requirement has one scenario tagged with its id, and every
 ///   scenario's id names a requirement;
-/// - a scenario's priority tag equals its requirement's Pri column, and
-///   is absent when the row has none (NFR, ASM);
+/// - a scenario's priority tag equals its requirement's Pri field, and
+///   is absent when the requirement has none (NFR, ASM);
 /// - a scenario's invariant tags equal its requirement's Traces.
 ///
 /// A requirement edited in the SRS without its scenario, or a scenario

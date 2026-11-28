@@ -5,9 +5,9 @@
 //! to, the linter configuration), on
 //! nothing else, and on no Rust source outside the review's crates.
 //!
-//! The guiding paths come from the ENG-21 row of the SRS: each class
-//! it names maps to the paths that hold it today, and a class the row
-//! stops naming is reported, so the mapping cannot go stale unseen. The
+//! The guiding paths come from ENG-21 in the SRS: each class it names
+//! maps to the paths that hold it today, and a class it stops naming
+//! is reported, so the mapping cannot go stale unseen. The
 //! stakeholder is read from the SRS as well.
 
 use std::fs;
@@ -28,7 +28,7 @@ pub struct Entry {
 /// the evaluation with its cases and scorecard.
 const REVIEW_CRATES: &str = "tooling/review-*/";
 
-/// What the ENG-21 row names as guiding the review, as the words it
+/// What ENG-21 names as guiding the review, as the words it
 /// uses and the paths that hold each class. A path with a `*` stands
 /// for each directory of its parent the name matches.
 const ENFORCING: &[(&str, &[&str])] = &[
@@ -232,8 +232,8 @@ fn expand(checkout: &Checkout, path: &str) -> Vec<String> {
     paths
 }
 
-/// Problems with the stakeholder's ownership: the ENG-21 row no longer
-/// names a class this check maps, or a guiding path that exists is not
+/// Problems with the stakeholder's ownership: ENG-21 no longer names
+/// a class this check maps, or a guiding path that exists is not
 /// owned by the stakeholder alone.
 #[must_use]
 pub fn stakeholder_owns_the_enforcing_paths(checkout: &Checkout) -> Vec<String> {
@@ -241,14 +241,14 @@ pub fn stakeholder_owns_the_enforcing_paths(checkout: &Checkout) -> Vec<String> 
         (Ok(s), Ok(e)) => (s, e),
         (r, e) => return [r.err(), e.err()].into_iter().flatten().collect(),
     };
-    let row = match checkout.requirement("ENG-21") {
-        Ok(row) => row.text,
+    let text = match checkout.requirement("ENG-21") {
+        Ok(requirement) => requirement.text,
         Err(e) => return vec![e],
     };
     let mut problems: Vec<String> = ENFORCING
         .iter()
-        .filter(|(phrase, _)| !row.contains(phrase))
-        .map(|(phrase, _)| format!("the ENG-21 row no longer says {phrase:?}"))
+        .filter(|(phrase, _)| !text.contains(phrase))
+        .map(|(phrase, _)| format!("ENG-21 no longer says {phrase:?}"))
         .collect();
     problems.extend(unsupported_patterns(&entries));
     for (class, path) in existing_enforcing(checkout) {

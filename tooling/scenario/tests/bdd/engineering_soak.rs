@@ -136,7 +136,7 @@ fn ci_runs_miri(_: &mut World, file: String) -> Result<(), String> {
     let checkout = engineering::Checkout::new(&testkit::repo_root());
     let ci = checkout.read(&file)?;
     // Every unsafe block is the one shim's while no other crate can
-    // switch the ban off, and Miri runs that shim's tests: the row's
+    // switch the ban off, and Miri runs that shim's tests: ENG-09's
     // "Miri or ThreadSanitizer", met by Miri.
     let mut problems = crates_forbid_unsafe(&checkout);
     problems.extend(miri_problems(&ci));

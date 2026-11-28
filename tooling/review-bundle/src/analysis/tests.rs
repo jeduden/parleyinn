@@ -143,7 +143,7 @@ fn code_with_no_code_owner_reviews_deep_when_it_gates_or_is_security_sensitive()
 }
 
 #[test]
-fn security_crates_come_from_the_eng_11_row() {
+fn security_crates_come_from_eng_11() {
     assert_eq!(
         security_crates(&base()),
         Some(["pin", "search"].map(str::to_owned).to_vec())
@@ -164,7 +164,7 @@ fn security_crates_come_from_the_eng_11_row() {
 }
 
 #[test]
-fn an_eng_11_row_that_names_no_crate_fails_closed_and_says_so() {
+fn an_eng_11_that_names_no_crate_fails_closed_and_says_so() {
     let mut main = base();
     main.requirements.retain(|r| r.id != "ENG-11");
     main.requirements
@@ -205,7 +205,7 @@ fn analyse_finds_nothing_in_an_unchanged_tree() {
 }
 
 #[test]
-fn analyse_reads_added_removed_and_changed_rows() {
+fn analyse_reads_added_removed_and_changed_requirements() {
     let mut head = base();
     head.requirements[0].text = "Ingest every transcript.".into();
     head.requirements[1].line = 40;
@@ -427,7 +427,7 @@ fn eng_29_finding(path: &str, body: &str) -> Finding {
     }
 }
 
-/// `base()` with PRV-10's row changed.
+/// `base()` with PRV-10 changed.
 fn prv_10_changed() -> Snapshot {
     let mut head = base();
     head.requirements[2].text = "Certify, now differently.".into();
@@ -473,7 +473,7 @@ fn analyse_reads_an_invariant_change_from_the_trees_whatever_the_diff_names() {
 }
 
 #[test]
-fn analyse_names_the_invariant_and_the_marked_row_together() {
+fn analyse_names_the_invariant_and_the_marked_requirement_together() {
     let (findings, _) = guarded(
         &mut prv_10_changed(),
         None,
@@ -491,7 +491,7 @@ fn analyse_names_the_invariant_and_the_marked_row_together() {
 }
 
 #[test]
-fn analyse_asks_eng_29_s_record_for_a_row_marked_for_i2_review() {
+fn analyse_asks_eng_29_s_record_for_a_requirement_marked_for_i2_review() {
     let mut other = base();
     other.requirements[0].text = "Changed, but not marked.".into();
 
@@ -512,25 +512,25 @@ fn analyse_asks_eng_29_s_record_for_a_row_marked_for_i2_review() {
 }
 
 #[test]
-fn analyse_asks_eng_29_s_record_for_a_change_to_its_own_row() {
+fn analyse_asks_eng_29_s_record_for_a_change_to_eng_29_itself() {
     let mut head = base();
     let own = head.requirements.len() - 1;
     head.requirements[own].text = "A change to an invariant MUST land with an ADR.".into();
 
     let (findings, _) = guarded(&mut head.clone(), None, &["docs/srs/10.md"], false);
-    let adr = record("accepted", "ENG-29: its own row changes, approved.");
+    let adr = record("accepted", "ENG-29: it changes, approved.");
     let (with_record, record) = guarded(&mut head, Some(adr), &[ADR], true);
 
     assert_eq!(
         findings,
         [
             eng_29_finding(
-                &row_path(&base(), "ENG-29").unwrap(),
-                "this change touches ENG-29's own row (ENG-29), but no accepted ADR under docs/adr that this change changes names ENG-29"
+                &requirement_path(&base(), "ENG-29").unwrap(),
+                "this change touches ENG-29 itself (ENG-29), but no accepted ADR under docs/adr that this change changes names ENG-29"
             ),
             eng_29_finding(
-                &row_path(&base(), "ENG-29").unwrap(),
-                "this change touches ENG-29's own row (ENG-29), but no stakeholder comment consents to it"
+                &requirement_path(&base(), "ENG-29").unwrap(),
+                "this change touches ENG-29 itself (ENG-29), but no stakeholder comment consents to it"
             ),
         ]
     );
@@ -539,7 +539,7 @@ fn analyse_asks_eng_29_s_record_for_a_change_to_its_own_row() {
 }
 
 #[test]
-fn analyse_places_a_removed_marked_row_where_main_had_it() {
+fn analyse_places_a_removed_marked_requirement_where_main_had_it() {
     let mut head = base();
     head.requirements.remove(2);
 
@@ -709,7 +709,7 @@ fn analyse_ignores_a_deleted_record() {
 }
 
 #[test]
-fn marked_for_i2_review_reads_eng_29_s_row() {
+fn marked_for_i2_review_reads_eng_29() {
     assert_eq!(marked_for_i2_review(&base()), ["PRV-10", "PRV-11"]);
     let mut without = base();
     without.requirements.pop();
@@ -724,11 +724,11 @@ fn and_list_joins_with_a_final_and() {
 }
 
 #[test]
-fn analyse_dispatches_by_path_and_by_the_rows_the_diff_names() {
+fn analyse_dispatches_by_path_and_by_the_requirements_the_diff_names() {
     let mut head = base();
-    let mut row = req("REC-03", "New.");
-    row.path = "docs/srs/06-security.md".into();
-    head.requirements.push(row);
+    let mut added = req("REC-03", "New.");
+    added.path = "docs/srs/06-security.md".into();
+    head.requirements.push(added);
     let diff = format!("{}+REC-01 REC-03\n", header("crates/pin/src/lib.rs"));
 
     let got = analyse(&base(), &head, &diff, &[]);
@@ -767,13 +767,13 @@ fn a_review_below_deep_keeps_the_normal_generalists() {
 }
 
 #[test]
-fn a_row_markdown_only_quotes_brings_no_specialist() {
+fn a_requirement_markdown_only_quotes_brings_no_specialist() {
     let mut head = base();
-    let mut row = req("REC-03", "New.");
-    row.path = "docs/srs/06-security.md".into();
-    head.requirements.push(row.clone());
+    let mut quoted = req("REC-03", "New.");
+    quoted.path = "docs/srs/06-security.md".into();
+    head.requirements.push(quoted.clone());
     let mut main = base();
-    main.requirements.push(row);
+    main.requirements.push(quoted);
     let diff = format!("{}+ quotes REC-03\n", header("docs/notes.md"));
 
     let got = analyse(&main, &main, &diff, &[]);

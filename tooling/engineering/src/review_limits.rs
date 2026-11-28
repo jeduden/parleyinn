@@ -1,7 +1,7 @@
 //! ENG-34: the review bundle flags, with no agent, each changed file
 //! past its kind's line limit and each changed file no review
-//! specialist reads. The check holds the bundle's limits to those the
-//! ENG-34 row states, then runs the review bundle on a change in a
+//! specialist reads. The check holds the bundle's limits to those
+//! ENG-34 states, then runs the review bundle on a change in a
 //! fixture tree, once with a Rust file past its limit and a file no
 //! specialist reads and once with files within their limits that
 //! specialists read, and reads the findings it wrote. It also holds the
@@ -22,7 +22,7 @@ use serde_json::Value;
 use crate::Checkout;
 
 /// The requirement that sets the limits.
-pub const ROW: &str = "ENG-34";
+pub const LIMITS_ID: &str = "ENG-34";
 /// The requirement a file no specialist reads leaves unmet.
 pub const UNREAD_ID: &str = "ENG-28";
 /// The Rust file the change past the limit adds.
@@ -62,20 +62,20 @@ pub struct Built {
     pub bundle: String,
 }
 
-/// Problems with the bundle's limits against the ENG-34 row of the
-/// checkout's SRS.
+/// Problems with the bundle's limits against ENG-34 in the checkout's
+/// SRS.
 #[must_use]
-pub fn limits_match_the_row(checkout: &Checkout) -> Vec<String> {
+pub fn limits_match_the_requirement(checkout: &Checkout) -> Vec<String> {
     match srs::load(&checkout.root.join("docs/srs")) {
         Err(e) => vec![format!("read docs/srs: {e}")],
-        Ok(rows) => match rows.iter().find(|r| r.id == ROW) {
-            None => vec![format!("no {ROW} row in docs/srs")],
-            Some(row) => limits_match(&row.text),
+        Ok(requirements) => match requirements.iter().find(|r| r.id == LIMITS_ID) {
+            None => vec![format!("no requirement {LIMITS_ID} in docs/srs")],
+            Some(requirement) => limits_match(&requirement.text),
         },
     }
 }
 
-/// Problems with the bundle's limits against `text`, the ENG-34 row's:
+/// Problems with the bundle's limits against `text`, ENG-34's:
 /// each limit one holds and the other does not.
 #[must_use]
 pub fn limits_match(text: &str) -> Vec<String> {
@@ -85,10 +85,10 @@ pub fn limits_match(text: &str) -> Vec<String> {
         .map(|(kind, _, limit)| ((*kind).to_owned(), *limit))
         .collect();
     let missing = held.iter().filter(|l| !stated.contains(l)).map(|(k, n)| {
-        format!("the {ROW} row states no limit of {n} for {k}, which the review bundle holds")
+        format!("{LIMITS_ID} states no limit of {n} for {k}, which the review bundle holds")
     });
     let extra = stated.iter().filter(|l| !held.contains(l)).map(|(k, n)| {
-        format!("the review bundle holds no limit of {n} for {k}, which the {ROW} row states")
+        format!("the review bundle holds no limit of {n} for {k}, which {LIMITS_ID} states")
     });
 
     missing.chain(extra).collect()
@@ -218,7 +218,9 @@ fn cites(nit: &Nit, path: &str, id: &str) -> bool {
 /// Whether `nit` cites ENG-34 or the ENG-28 of a file no specialist
 /// reads.
 fn ours(nit: &Nit) -> bool {
-    [ROW, UNREAD_ID].iter().any(|id| cites(nit, &nit.path, id))
+    [LIMITS_ID, UNREAD_ID]
+        .iter()
+        .any(|id| cites(nit, &nit.path, id))
 }
 
 /// The problem when `built` holds no nit at `path` in the finding form
@@ -242,7 +244,7 @@ pub fn listed(built: &Built) -> Vec<String> {
     let nits: Vec<&Nit> = built.checked.iter().filter(|n| ours(n)).collect();
     if nits.is_empty() {
         return vec![format!(
-            "the review bundle lists no {ROW} or {UNREAD_ID} nit"
+            "the review bundle lists no {LIMITS_ID} or {UNREAD_ID} nit"
         )];
     }
     nits.iter()
