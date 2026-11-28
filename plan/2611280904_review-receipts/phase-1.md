@@ -23,7 +23,11 @@ Requirements. New ids, numbered when they are written:
 - an engineering requirement for running the default branch's review
   again after every merge;
 - ENG-28 gains the review outcome a check receipt carries, and how it
-  is weighed.
+  is weighed;
+- ENG-21 gains the stakeholder's ruling on what "a reviewer other than
+  its author" means once a check receipt carries the review outcome;
+- ENG-16's list of what CI gates on says which checks a verified check
+  receipt may answer.
 
 Each lands with its scenario under `features/`, tagged `@pending`.
 
