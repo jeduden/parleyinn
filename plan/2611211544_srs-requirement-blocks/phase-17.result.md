@@ -37,7 +37,7 @@ summary: >-
 
 - RED: none, since a slip fails no run and no case plants an id a
   specialist should be unsure of.
-- `review-eval plan` against phase 16 merged with main names 42
+- `review-eval plan` against main, which now holds phase 16, names 42
   components and 141 cases.
 - `review-eval run` passed every case of the 41 planned before main's
   merge on its model: 270 of 270 runs, 2.61 USD, 175 slipping; on phase
@@ -50,16 +50,18 @@ summary: >-
   slips fell from 61 to 45 of 82 specialist runs: 49 of phase 16's said
   no requirement row was touched, and none of phase 17's names a row.
   Defect and injection cases slipped 130 times on either text.
-- Merged with main, `mdsmith check .`, the srs and scenario gates,
-  `review-eval check` (242 cases, 75 components), the workspace's 4,648
-  tests and the cucumber scenarios `@ENG-21`, `@ENG-27`, `@ENG-28`,
-  `@ENG-32` and `@ENG-34` pass, and the drift suite catches the 10 cases
-  that inject a file the change touches.
+- Merged with main, which now holds phase 16 and the review of a head
+  merged into main (#183), from a clean build: `mdsmith check .`, the
+  srs and scenario gates, `review-eval check` (242 cases, 75
+  components), the workspace's 4,666 tests and the cucumber scenarios
+  `@ENG-21`, `@ENG-27`, `@ENG-28`, `@ENG-32` and `@ENG-34` pass, and
+  the drift suite catches the 10 cases that inject a file the change
+  touches.
 - The reviewer-engineer agent found no blocking finding, and its two
   gaps are closed above.
-- `scripts/review-local.sh` against phase 16 merged with main approves:
-  2 of 2 agents consulted, no finding, 0.17 USD. It blocks only on
-  the consent `.claude/agents/` and `docs/agents/` need.
+- `scripts/review-local.sh` against main approves: 2 of 2 agents
+  consulted, no finding, 0.19 USD. It blocks only on the consent
+  `.claude/agents/` and `docs/agents/` need.
 
 ## Next
 
