@@ -49,8 +49,9 @@ This phase writes them into the model and the SRS:
   signed bytes, and the check refuses any receipt without it.
 - The place. `record.md` gains the result receipt as a third receipt
   kind: for one commit, the own-check results its node recorded, the
-  digest of the `parinn` release and the review outcome. Its results
-  keep evidence class `own check`, and LANE-05 does not change.
+  digest of the `parinn` release and the review outcome. Each result
+  carries its LANE-05 class, at most `own check`; LANE-05 does not
+  change.
 - The action. OQ-32 gains the GitHub action as a third way the CLI
   ships. A new engineering requirement makes it a stable interface:
   its inputs, its outputs, its exit status, and its release signed
