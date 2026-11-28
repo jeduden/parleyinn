@@ -44,18 +44,18 @@ summary: >-
 - Merged with phase 16 and main, srs-security, whose section lost the
   threat model, passes its 3 cases in 6 of 6 runs, none asking for a
   change.
-- Merged with phase 16 and main, from a clean build: the workspace's
-  4,651 tests, clippy denying warnings, rustfmt, the srs and scenario
-  gates, `review-eval check` (242 cases, 75 components),
-  `mdsmith check .` and the cucumber scenarios `@ENG-21`, `@ENG-27`,
-  `@ENG-28`, `@ENG-32` and `@ENG-34` pass: 5 scenarios, 77 steps. No
-  drift case injects a file the change touches.
-- `scripts/review-local.sh` against phase 16 merged with main: the
-  agents approve, 5 of 5 consulted, no finding, 0.30 USD. It blocks
-  only on the consent `tooling/review-eval/` needs. Its evaluation plans no
-  component: main's derived cases judge a pull request, so the runs
-  above are this one's proof, and the weekly run takes the new MUST
-  once it merges.
+- Merged with main, which now holds phase 16 and the review of a head
+  merged into main (#183), from a clean build: the workspace's 4,669
+  tests, clippy denying warnings, rustfmt, the srs and scenario gates,
+  `review-eval check` (242 cases, 75 components), `mdsmith check .`
+  and the cucumber scenarios `@ENG-21`, `@ENG-27`, `@ENG-28`, `@ENG-32`
+  and `@ENG-34` pass: 5 scenarios, 79 steps. No drift case injects a
+  file the change touches.
+- `scripts/review-local.sh` against main: the agents approve, 5 of 5
+  consulted, no finding, 0.37 USD. It blocks only on the consent
+  `tooling/review-eval/` needs. Its evaluation plans no component:
+  main's derived cases judge a pull request, so the runs above are this
+  one's proof, and the weekly run takes the new MUST once it merges.
 
 ## Next
 
