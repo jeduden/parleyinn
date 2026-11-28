@@ -106,7 +106,7 @@ pub fn run_probe(
 }
 
 /// Waits for `child` to end, and kills it when `limit` passes first.
-fn wait_within(child: &mut Child, limit: Duration) -> Result<ExitStatus, String> {
+pub(crate) fn wait_within(child: &mut Child, limit: Duration) -> Result<ExitStatus, String> {
     let deadline = Instant::now() + limit;
     loop {
         if let Some(status) = child.try_wait().map_err(|e| format!("wait: {e}"))? {
@@ -124,7 +124,7 @@ fn wait_within(child: &mut Child, limit: Duration) -> Result<ExitStatus, String>
 
 /// Everything `pipe` holds. A pipe that fails mid-read leaves the text
 /// so far, which is all a probe needs.
-fn drain(mut pipe: impl Read) -> String {
+pub(crate) fn drain(mut pipe: impl Read) -> String {
     let mut text = String::new();
     let _ = pipe.read_to_string(&mut text);
 
