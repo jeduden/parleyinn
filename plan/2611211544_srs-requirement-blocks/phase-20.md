@@ -1,7 +1,7 @@
 ---
 n: 20
 title: "What a review keeps for the next in a requirement of its own"
-status: "🔳"
+status: "✅"
 result: false
 ---
 # Phase 20: What a review keeps for the next in a requirement of its own
