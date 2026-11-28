@@ -7,7 +7,8 @@
 //! spent is reset; the job that holds the reviewer app's key puts that
 //! error in the summary of the check it fails. The checks run
 //! `review-run` under a cap its first run reaches, then the gate on
-//! what it wrote, and read the job's text.
+//! what it wrote, and read the job's text, each script a step of it
+//! runs among it.
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -35,7 +36,10 @@ const SAYS: [(&str, &str); 3] = [
 ];
 
 /// What the job of `flow` that holds `key` lacks to say, in the check
-/// it fails, why the gate did not decide.
+/// it fails, why the gate did not decide. A flow that
+/// `review_workflow::load` read holds each script of `scripts/` a step
+/// runs as that step's text, so what the job says may stand in its
+/// script, `scripts/review-decide.sh` in the review's workflow.
 ///
 /// # Errors
 ///
