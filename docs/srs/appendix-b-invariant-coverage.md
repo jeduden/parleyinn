@@ -16,7 +16,7 @@ source, [§1.3](invariants.md).
   LANE-19, OWN-19, OWN-28, PEER-05, RCL-01, RCL-03, RCL-08, REC-01, REC-02,
   REC-03, REC-04, REC-05, REC-06, REC-07, REC-08, REC-09, REC-13, REC-14,
   REC-15, REC-16, REC-17, REC-19, REC-20, REC-22, REC-24, REC-25, REC-26,
-  SEC-08, SEC-31, VIEW-01, VIEW-11, VIEW-12
+  SEC-08, SEC-31, SEC-33, VIEW-01, VIEW-11, VIEW-12
 - **I2**: REC-22, REC-23, REC-26, PRV-14, PRV-13, PRV-01, PRV-02, PRV-03,
   PRV-04, PRV-05, PRV-06, PRV-08, PRV-09, PRV-10, PRV-11, PRV-12, PIN-01,
   PIN-02, PIN-05, PIN-10, RCL-04, RCL-09, RCL-10, LMK-02, LMK-03, LMK-04,
@@ -45,7 +45,8 @@ source, [§1.3](invariants.md).
   VIEW-06, VIEW-08, VIEW-09, VIEW-10, VIEW-11, VIEW-14, VIEW-16, VIEW-17,
   VIEW-19, VIEW-20, OWN-02, OWN-05, OWN-06, OWN-08, OWN-14, OWN-15, OWN-21,
   OWN-22, OWN-23, OWN-25, OWN-29, PEER-05, PEER-06, PEER-10, PEER-11, PEER-13,
-  SEC-16, SEC-20, SEC-22, SEC-25, SEC-27, SEC-28, SEC-30, SEC-31, SEC-32
+  SEC-16, SEC-20, SEC-22, SEC-25, SEC-27, SEC-28, SEC-30, SEC-31, SEC-32,
+  SEC-33
 - **I7**: ADM-01, ADM-02, ADM-03, ADM-04, ADM-10, ADM-13, LANE-28, OWN-10,
   OWN-15, SEC-11, SEC-22, SEC-23, VIEW-18
 - **I8**: CMP-07, INJ-05, LANE-02, LANE-17, LANE-18, LANE-23, LANE-24, LANE-25,
@@ -66,7 +67,7 @@ source, [§1.3](invariants.md).
 
 | Priority | Functional and security (§5–§6) | Engineering (§10, §10.5) |
 | -------- | ------------------------------- | ------------------------ |
-| P0       | 92                              | 32                       |
+| P0       | 93                              | 32                       |
 | P1       | 109                             | 2                        |
 | P2       | 38                              | 0                        |
 | —        | Non-functional (§7): 15         |                          |

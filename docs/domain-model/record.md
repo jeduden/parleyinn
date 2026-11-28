@@ -186,7 +186,7 @@ from
   from the home and checked with no network. Always qualified: a **head
   receipt** lists every writer's chain head at a moment, the tamper evidence of
   VIEW-10 and SEC-27; a **purge receipt** states what a purge erased and what it
-  could not (SEC-31).
+  could not (SEC-33).
 - **Backup**: A copy of a home's store and audit log, with none of its keys
   (`parinn backup create`, ADM-06, SEC-10); reading it back is a backup
   restore (Node). Creating one records no principal act, only an audited event

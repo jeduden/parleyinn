@@ -413,7 +413,7 @@ Feature: Security (SEC)
     And the owner applying it is a widening principal act and refusing it a neutral one, either audited
 
   @SEC-31 @P0 @I1 @I5 @I6 @pending
-  Scenario: purging an event erases every copy this node holds and writes a signed purge receipt
+  Scenario: purging an event erases every copy this node holds
     Given an isolated ParleyInn home
     And an event whose content a recorded recall result names, and a payload, the index and a ParleyInn backup contain
     When the person purges the event
@@ -421,9 +421,9 @@ Feature: Security (SEC)
     And ingesting its transcript positions again from the harness transcript is refused with an audit entry
     And the transcript source's consumed-prefix hash is recomputed over the prefix with the bytes of each purged transcript line zeroed, so it confirms no guess at the purged bytes, only each purged line's position, length and the harness's own `uuid` remain, only ParleyInn's own record of the source changes, never the harness's transcript file, and "parinn ingest" resumes the source and "parinn verify" exits 0
     And for a transcript source whose transcript cannot be read or no longer holds what its stored hash covers, the purge stores a hash that confirms nothing, audited and counted, and "parinn ingest" starts a new transcript generation of that source (ADM-07, ADM-09)
-    And a signed purge receipt names the scope, the ranges, the copies erased and every known copy ParleyInn cannot erase
     And every prompt commitment whose prompt_id a purged event's line carries, matched or not, is erased with its key, and the receipt counts them
     And after a retention purge, and after a backup restore that reapplies the purge, no file in the home, decrypted, holds the purged events' canary token, their commitment keys or a search index entry naming them
+    And a purge that times out before its residue is gone does not report the range erased, and audits, counts and names each residue in its purge receipt
     And while a purge has residue, "parinn doctor" exits non-zero even after "parinn counter ack", the Needs you queue and Catch up show it, and once a retry clears it a further purge receipt is written
     And a purge a kill stopped after its erasure is recorded stays pending in the same way, no search matching a purged event, until the next "parinn purge", "parinn ingest" or "parinn rebuild" finishes it
     And no audit entry or log line carries the purged events' canary token
@@ -447,3 +447,12 @@ Feature: Security (SEC)
     And the facilitator's program writes room summaries only with "parinn room-summary write", signed with its device seat, and never acts through an MCP tool
     And a run seat that a principal whose device seat has the moderator role by role assignment appointed moderator is kept to the same limits, and that appointer can undo each of its bars and mutes, while a seat it kicked only that seat's own principal adds again
     And that appointer's appointment of a facilitator is refused, since only the owner appoints the facilitator
+
+  @SEC-33 @P0 @I1 @I6 @pending
+  Scenario: each node writes a signed purge receipt naming what a purge erased and every copy it cannot erase
+    Given an isolated ParleyInn home
+    And an event whose content a harness transcript file and an exported bundle also hold, as do a backup ParleyInn made and can no longer reach, a peer that refuses the erasure request and a peer that cannot be reached
+    When the person purges the event
+    Then the node writes a signed purge receipt naming the scope, the ranges and the copies erased
+    And the receipt names every copy ParleyInn knows of and cannot erase: the harness transcript file, the exported bundle, the backup and both peers
+    And the node's principal can collect the receipt, and "parinn purge-receipt check" exits 0 on it

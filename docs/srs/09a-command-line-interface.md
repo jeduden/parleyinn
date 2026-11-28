@@ -86,7 +86,7 @@ summary: >-
   by canonical digest, never printing one (ADM-08)
 - `parinn rebuild`: Rebuild every derived artifact; determinism (ADM-08)
 - `parinn head-receipt make|check`, `parinn purge-receipt check`: make a head
-  receipt or check one (VIEW-10, SEC-27), or check a purge receipt (SEC-31)
+  receipt or check one (VIEW-10, SEC-27), or check a purge receipt (SEC-33)
 - `parinn backup create|restore`: Create a backup, with no seat, device, token
   or at-rest key, or make a backup restore, a widening act (ADM-06)
 - `parinn migrate`: Segment and schema migration (ADM-05)
