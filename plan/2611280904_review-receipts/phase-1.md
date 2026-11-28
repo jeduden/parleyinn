@@ -18,7 +18,8 @@ Requirements. New ids, numbered when they are written:
   which key signs it, and that the signed bytes hold the digest of the
   `parinn` release that made it;
 - an engineering requirement for the GitHub action as an interface
-  other projects rely on;
+  other projects rely on: it runs nothing the pull request supplies,
+  and matches the locked `parinn` to its Sigstore identity (ENG-20);
 - an engineering requirement for result-receipt verification: the
   checklist of the design's section 5, run with no network, no agent
   and no model credential;
@@ -30,6 +31,9 @@ Requirements. New ids, numbered when they are written:
   its author" means once a result receipt carries the review outcome;
 - ENG-16's list of what CI gates on says which checks a verified result
   receipt may answer.
+
+They carry §1.2's reuse rule. They say how the review outcome stays
+unchanged until `result-receipt make` signs it (ENG-28).
 
 Each lands with its scenario under `features/`, tagged `@pending`.
 

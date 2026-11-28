@@ -97,7 +97,8 @@ sets them out:
   certificate in the receipt. SEC-10 already allows both. A fixed
   domain tag opens the signed bytes, so a receipt never reads as a
   principal act. The default branch lists device keys, never one key
-  per node.
+  per node, in a file on a path `CODEOWNERS` names, so no pull request
+  adds a key without the stakeholder.
 - The concept is the result receipt, a third receipt kind beside head
   and purge. It states the own-check results its node recorded for one
   commit, the digest of the `parinn` release and the review outcome.

@@ -48,9 +48,7 @@ ParleyInn's way of working keeps a change fast and its overhead low by
 not doing settled work twice. An agent recalls what it already found
 instead of deriving it again. A result of a check keeps the evidence it
 rests on, bound to the tree it ran on, so that check need not run again
-on a tree it already ran on. Where a result must leave the node, a
-signed statement of it lets the receiving node check that statement
-instead of redoing the work. Reuse never raises a result's evidence
+on a tree it already ran on. Reuse never raises a result's evidence
 class, never skips a check a requirement or the forge's branch
 protection requires, and always shows what was reused and what ran
 fresh.
