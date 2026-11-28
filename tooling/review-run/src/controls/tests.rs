@@ -322,6 +322,16 @@ fn a_run_waits_for_its_whole_cap_while_that_can_still_fit() {
 }
 
 #[test]
+fn a_run_starts_on_what_is_left_when_that_is_its_reserve_exactly() {
+    let budget = Budget::new(PULL_REQUEST_COST_USD, 4.25);
+    assert!(budget.fits(GENERALIST));
+
+    let held = budget.reserve(GENERALIST, WAIT).unwrap();
+
+    assert!((held.held() - 0.75).abs() < 1e-9, "{}", held.held());
+}
+
+#[test]
 fn what_a_run_holds_of_what_is_left_is_in_whole_cents_and_never_more() {
     let budget = Budget::new(1.0, 0.2345);
 
