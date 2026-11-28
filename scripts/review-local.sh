@@ -2,14 +2,14 @@
 # Runs the review of HEAD against origin/main here, before a push, so a
 # finding costs a minute of this loop and not a CI round (ENG-28).
 #
-# It prepares the work directory the review workflow prepares (main's
-# tree, the head's under pr-head/, the diff, the stakeholder's comments,
-# the head's agent instructions moved out of the agents' load path) and
-# runs this checkout's review-bundle, review-eval plan and review-run;
-# CI runs main's. The agents are the head's .claude/agents/*.md by
-# default (--agents head), as main has them after the merge, since the
-# tools expect the finding grammar they define; --agents base keeps the
-# base's, as CI runs them today. The review reads no skill.
+# It prepares the review workflow's work directory (main's tree, the
+# head merged into it under pr-head/, the diff, the stakeholder's
+# comments, the head's agent instructions moved out of the agents' load
+# path) and runs this checkout's review-bundle, review-eval plan and
+# review-run; CI runs main's. The agents are the merge's
+# .claude/agents/*.md by default (--agents head), since the tools expect
+# the finding grammar they define; --agents base keeps the base's, as CI
+# runs them today. The review reads no skill.
 #
 # Prints the verdict, each finding on one line, the bundle's
 # deterministic findings, the cost, the time taken and the evaluation
@@ -116,7 +116,7 @@ rmdir "$work"
 git -C "$repo" worktree add -q --detach "$work" "$base"
 git -C "$repo" worktree add -q --detach "$work/pr-head" HEAD
 cd "$work"
-git -C pr-head diff "$base...HEAD" > pr.diff
+"$repo/scripts/review-merge-head.sh"
 if [ -n "$consent" ]; then cp "$consent" stakeholder-comments.json; else echo '[]' > stakeholder-comments.json; fi
 
 mkdir -p review/reports

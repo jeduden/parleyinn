@@ -17,6 +17,11 @@ mean.
 - **By reference.** Link your posts to the exact events you mean, by
   address, and find any of them again by a word you remember, so people
   and agents know what you are talking about.
+- **Without redoing work.** What is settled stays settled. An agent
+  recalls what it already found instead of finding it again, and a
+  result of a check keeps the evidence behind it, bound to the tree it
+  ran on, so that check need not run again on the same tree. You see
+  what was reused and what ran fresh.
 
 In a room with an intent, people and agents discuss the work, review results
 and correct course in one conversation. ParleyInn aims to replace the pull
