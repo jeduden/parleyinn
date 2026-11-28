@@ -38,7 +38,7 @@ summary: >-
 - RED: none, since a slip fails no run and no case plants an id a
   specialist should be unsure of.
 - `review-eval plan` against main, which now holds phase 16, names 42
-  components and 141 cases.
+  components and 141 cases, and again once main held #154 and #189.
 - `review-eval run` passed every case of the 41 planned before main's
   merge on its model: 270 of 270 runs, 2.61 USD, 175 slipping; on phase
   16's text, 270 of 271, 191 slipping. Merged with main,
@@ -50,13 +50,15 @@ summary: >-
   slips fell from 61 to 45 of 82 specialist runs: 49 of phase 16's said
   no requirement row was touched, and none of phase 17's names a row.
   Defect and injection cases slipped 130 times on either text.
-- Merged with main, which now holds phase 16 and the review of a head
-  merged into main (#183), from a clean build: `mdsmith check .`, the
-  srs and scenario gates, `review-eval check` (242 cases, 75
-  components), the workspace's 4,666 tests and the cucumber scenarios
+- Merged with main, which now holds phase 16, the review of a head
+  merged into main (#183), phases 4 to 7 and 9 of plan 2611190753
+  (#154) and phase 18 (#189), from a clean build: `mdsmith check .`,
+  the srs and scenario gates, `review-eval check` (242 cases, 75
+  components), the workspace's 4,727 tests and the cucumber scenarios
   `@ENG-21`, `@ENG-27`, `@ENG-28`, `@ENG-32` and `@ENG-34` pass, and
   the drift suite catches the 10 cases that inject a file the change
-  touches.
+  touches. The domain model hub's agent file, which #154 also changed,
+  is written again by mdsmith from both.
 - The reviewer-engineer agent found no blocking finding, and its two
   gaps are closed above.
 - `scripts/review-local.sh` against main approves: 2 of 2 agents
