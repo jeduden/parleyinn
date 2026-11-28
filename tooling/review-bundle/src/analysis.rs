@@ -145,7 +145,7 @@ pub struct Analysis {
     /// Those of `findings` that turn on the stakeholder's consent
     /// (ENG-21, ENG-29, ENG-34), in either state. The gate weighs them
     /// and no agent is shown one: a comment changes them, and what an
-    /// agent reads does not turn on a comment (ENG-28).
+    /// agent reads does not turn on a comment (ENG-37).
     pub on_consent: Vec<Finding>,
     /// The agents the review runs (ENG-28).
     pub dispatch: dispatch::Dispatch,

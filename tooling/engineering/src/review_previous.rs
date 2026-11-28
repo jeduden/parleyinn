@@ -1,4 +1,4 @@
-//! ENG-28: a review carries the findings of the previous review of its
+//! ENG-37: a review carries the findings of the previous review of its
 //! pull request, and trusts them only from a run of main's review
 //! workflow. The review job fetches them with `scripts/review-previous.sh`
 //! before the Claude token is staged, passes `review-run` the file as

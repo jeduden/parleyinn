@@ -1,6 +1,7 @@
-//! The ENG-28 steps: the review workflow runs the review's agents by
-//! code, keeps them away from the reviewer app's key, and the review gate
-//! decides as the requirement says.
+//! The ENG-28 and ENG-37 steps: the review workflow runs the review's
+//! agents by code, keeps them away from the reviewer app's key, carries
+//! findings and spend from one review to the next, and the review gate
+//! decides as the requirements say.
 
 use cucumber::gherkin::Step;
 use cucumber::{then, when};

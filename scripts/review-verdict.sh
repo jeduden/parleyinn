@@ -1,6 +1,6 @@
 #!/bin/bash
 # After a stakeholder's comment, looks for the verdict an earlier review
-# of the same head kept, so the comment's review runs no agent (ENG-28):
+# of the same head kept, so the comment's review runs no agent (ENG-37):
 # consent is a comment, and a comment changes only what the review
 # bundle's deterministic findings say, which this run states again. It
 # only fetches: the earlier reviews are the runs behind the spend the

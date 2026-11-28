@@ -1,7 +1,7 @@
 #!/bin/bash
 # Says whether the reviewer evaluation's plan is empty (ENG-32), and,
 # when the review reused an earlier review's verdict on this head
-# (ENG-28), keeps that review's evaluation in place of running the
+# (ENG-37), keeps that review's evaluation in place of running the
 # cases again: `empty` is true for an empty plan, false for cases to
 # run, and kept when the earlier run's evaluation, scrubbed there, was
 # fetched into review-eval/. An evaluation that cannot be fetched is

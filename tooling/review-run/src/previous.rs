@@ -1,5 +1,5 @@
 //! The `review-run previous` command: which earlier review of a pull
-//! request its findings are carried from (ENG-28). `previous select`
+//! request its findings are carried from (ENG-37). `previous select`
 //! reads the artifacts GitHub lists under a pull request's name and the
 //! runs that uploaded them, and names the newest one a run of main's
 //! review workflow uploaded; an artifact of that name from any other

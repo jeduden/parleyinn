@@ -1,6 +1,6 @@
 #!/bin/bash
 # Fetches the findings the previous review of the pull request kept, for
-# `review-run --previous` (ENG-28). It only fetches: `review-run previous
+# `review-run --previous` (ENG-37). It only fetches: `review-run previous
 # select` decides which artifact is trusted, since an artifact of this
 # name may come from any workflow a pull request defines, and `review-run
 # previous check` refuses a file that does not read. Whatever it finds or
