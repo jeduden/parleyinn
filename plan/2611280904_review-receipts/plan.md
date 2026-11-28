@@ -97,11 +97,13 @@ sets them out:
   certificate in the receipt. SEC-10 already allows both. A fixed
   domain tag opens the signed bytes, so a receipt never reads as a
   principal act. The default branch lists device keys, never one key
-  per node.
+  per node, in a file on a path `CODEOWNERS` names, so no pull request
+  adds a key without the stakeholder.
 - The concept is the result receipt, a third receipt kind beside head
   and purge. It states the own-check results its node recorded for one
   commit, the digest of the `parinn` release and the review outcome.
-  Its results keep evidence class `own check`; LANE-05 does not change.
+  Each result carries its LANE-05 class, at most `own check`; LANE-05
+  does not change.
   To stay own checks, each check runs as a tool call of the editing
   run, so its exit status is a capture. The receipt binds each result
   to its entry in the default branch's list, so a substituted command
@@ -201,7 +203,8 @@ footer: |
 - [ ] The GitHub action verifies a result receipt with no agent, no
       model credential and no network, and refuses one changed byte
 - [ ] A pull request on an ordinary path gets `review-gate` about half
-      a minute after its push once every check declares its inputs
+      a minute after its push, once CI passed on its head and every
+      check declares its inputs
 - [ ] Every path a code owner holds still gets every check and every
       reviewer on the forge runner before the merge
 - [ ] The default branch's checks and review run after every merge,
