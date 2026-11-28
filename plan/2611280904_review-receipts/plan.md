@@ -103,12 +103,15 @@ sets them out:
   commit, the digest of the `parinn` release and the review outcome.
   Its results keep evidence class `own check`; LANE-05 does not change.
   To stay own checks, each check runs as a tool call of the editing
-  run, so its exit status is a capture.
+  run, so its exit status is a capture. The receipt binds each result
+  to its entry in the default branch's list, so a substituted command
+  never counts.
 - The GitHub action is a way the core's CLI ships to a forge, a third
   shipping form under OQ-32, and the way another project adopts
   ParleyInn. It gets a requirement as a stable interface. The check
   script ships as a template each project owns, until the launcher
-  takes over.
+  takes over; a requirement settles SEC-29 and ENG-16 for it before it
+  ships.
 - The commands are `parinn result-receipt plan|make|check`, beside
   `head-receipt make|check`. The node-wide `verify` keeps checking the
   node's own record.

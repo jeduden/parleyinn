@@ -42,7 +42,7 @@ This phase writes them into the model and the SRS:
 - The key. The editing node's device key signs, or on an ephemeral
   node the token key its access token carries, with its token
   certificate. SEC-10 does not change. A fixed domain tag opens the
-  signed bytes.
+  signed bytes, and the check refuses any receipt without it.
 - The place. `record.md` gains the result receipt as a third receipt
   kind: for one commit, the own-check results its node recorded, the
   digest of the `parinn` release and the review outcome. Its results
@@ -50,8 +50,8 @@ This phase writes them into the model and the SRS:
 - The action. OQ-32 gains the GitHub action as a third way the CLI
   ships. A new engineering requirement makes it a stable interface:
   its inputs, its outputs, its exit status, and its release signed
-  with `parinn` (ENG-20). The check script is a template each project
-  owns, not a component.
+  like `parinn`, keyless through Sigstore (ENG-20). The check script
+  is a template each project owns, not a component.
 - The names. §9.5 gains `parinn result-receipt plan|make|check`,
   beside the head receipt's row.
 
