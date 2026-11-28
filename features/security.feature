@@ -455,4 +455,4 @@ Feature: Security (SEC)
     When the person purges the event
     Then the node writes a signed purge receipt naming the scope, the ranges and the copies erased
     And the receipt names every copy ParleyInn knows of and cannot erase: the harness transcript file, the exported bundle, the backup and both peers
-    And the node's principal can collect the receipt, and "parinn purge-receipt check" checks it
+    And the node's principal can collect the receipt, and "parinn purge-receipt check" exits 0 on it

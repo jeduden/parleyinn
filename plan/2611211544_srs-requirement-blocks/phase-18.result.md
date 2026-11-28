@@ -38,6 +38,11 @@ summary: >-
 - `review-eval check` finds every case applies: 242 cases, 75
   components. Against main, the evaluation plans no component.
 - The drift suite catches the 4 cases that inject a file this changes.
+- `scripts/review-local.sh` against main approves: 15 of 15 agents
+  consulted, four nits. lang-gherkin's is taken: SEC-33's last step
+  says `parinn purge-receipt check` exits 0 on the receipt. A step for
+  a receipt altered after signing waits for the scenario's binding, and
+  SEC-19's digests wait as Next says.
 
 ## Next
 
