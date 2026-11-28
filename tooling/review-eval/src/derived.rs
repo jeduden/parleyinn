@@ -443,8 +443,10 @@ fn line_of(text: &str, word: &str) -> usize {
 /// The first cited requirement id, on `line` of the file, swapped for
 /// one that does not exist: the model specialist's check of every id
 /// its file cites. The swap is the file's one change, so a linked
-/// finding at its line is its finding, whether its sentence names the
-/// id or not.
+/// finding at its line that cites the id the citation means is its
+/// finding, whether its sentence names the missing id or not. A line
+/// that ends in the missing id does not read, to the review or the
+/// grader.
 fn missing_requirement(name: &str, path: &str, id: &str, line: usize) -> Case {
     let prefix = id.split_once('-').map_or(id, |(p, _)| p);
     let missing = format!("{prefix}-99");
@@ -464,6 +466,7 @@ fn missing_requirement(name: &str, path: &str, id: &str, line: usize) -> Case {
                 path: path.to_owned(),
                 line: Some(line),
                 form: Some(LINKED.to_owned()),
+                ids: vec![id.to_owned()],
                 ..Expected::default()
             }],
             ..Expect::default()

@@ -243,6 +243,19 @@ fn decide_refuses_a_review_that_left_a_dispatched_agent_out() {
     );
     assert!(std::error::Error::source(&err).is_none());
 
+    let dry = "over budget: the pull request's reviews cost 4.9100 USD, and a run capped at 0.30 \
+               USD does not fit in its cap of 5.00 USD, so it was not started";
+    let named = left_out::did_not_run("srs-security", dry);
+    i.outcome.findings = vec![finding(REVIEW_PATH, 0, BLOCKING, &named)];
+    assert_eq!(
+        decide(&i).unwrap_err().to_string(),
+        format!(
+            "review: dispatched but not consulted: lang-rust, srs-security ({dry}); {}",
+            left_out::RESET
+        )
+    );
+
+    i.outcome.findings.clear();
     i.consulted = set(&["lang-rust", "review-code", "srs-security", "extra"]);
     assert_eq!(decide(&i).unwrap().unwrap().event, APPROVE);
 }

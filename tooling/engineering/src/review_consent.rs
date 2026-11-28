@@ -98,8 +98,13 @@ pub fn differences(without: &Path, with: &Path) -> Vec<String> {
     }
     // Either run's contexts: one that only a comment brings, or takes
     // away, turns on the comment too.
-    let mut contexts = contexts(without);
-    contexts.extend(self::contexts(with));
+    let mut contexts = Vec::new();
+    for dir in [without, with] {
+        match self::contexts(dir) {
+            Ok(names) => contexts.extend(names),
+            Err(problem) => problems.push(problem),
+        }
+    }
     contexts.sort();
     contexts.dedup();
     if contexts.is_empty() {
@@ -132,17 +137,22 @@ fn blocking(checked: &str) -> Result<Vec<String>, serde_json::Error> {
 }
 
 /// The contexts the review bundle wrote under `out`, each relative to
-/// it, sorted; none when the directory does not read.
-fn contexts(out: &Path) -> Vec<String> {
-    let mut names: Vec<String> = fs::read_dir(out.join(CONTEXTS))
-        .into_iter()
-        .flatten()
-        .filter_map(Result::ok)
+/// it, sorted: none when it wrote no directory of them, and the
+/// directory named with its error when that does not read.
+fn contexts(out: &Path) -> Result<Vec<String>, String> {
+    let dir = out.join(CONTEXTS);
+    let entries = match fs::read_dir(&dir) {
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+        read => read.and_then(|entries| entries.collect::<Result<Vec<_>, _>>()),
+    };
+    let mut names: Vec<String> = entries
+        .map_err(|e| format!("read {}: {e}", dir.display()))?
+        .iter()
         .map(|entry| format!("{CONTEXTS}/{}", entry.file_name().to_string_lossy()))
         .collect();
     names.sort();
 
-    names
+    Ok(names)
 }
 
 /// What is wrong with `rel`, a file an agent reads: `was` its text with

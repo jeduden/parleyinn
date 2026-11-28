@@ -19,6 +19,7 @@ fn leaking_run() -> AgentRun {
             answer: format!("outcome: none — {TOKEN}"),
             texts: vec![format!("env: {TOKEN}"), "clean".to_owned()],
             writes: vec![TOKEN.to_owned()],
+            error: format!("API Error: near {TOKEN}"),
             ..RunLog::default()
         },
         parts: 2,
@@ -47,7 +48,7 @@ fn every_agent_written_field_of_a_run_is_scrubbed_and_counted() {
     let scrubber = Scrubber::new(&[TOKEN]);
     let mut runs = vec![leaking_run()];
 
-    assert_eq!(scrub_runs(&scrubber, &mut runs), 13);
+    assert_eq!(scrub_runs(&scrubber, &mut runs), 14);
 
     let run = &runs[0];
     let all = format!("{run:?}");
@@ -70,9 +71,9 @@ fn a_key_shaped_text_the_tree_holds_is_replaced_in_a_run_and_is_no_leak() {
     run.log.answer = format!("outcome: findings — tests.rs holds {fixture}");
     let mut runs = vec![run];
 
-    // The token's thirteen places but for the answer, which holds the
+    // The token's fourteen places but for the answer, which holds the
     // tree's text and no token.
-    assert_eq!(scrub_runs(&scrubber, &mut runs), 12);
+    assert_eq!(scrub_runs(&scrubber, &mut runs), 13);
 
     assert_eq!(
         runs[0].log.answer,

@@ -157,12 +157,12 @@ pub(super) fn review_run_report_cases() -> Vec<Case> {
             "review-run reading the requirement ids from main's tree alone",
             "ENG-28",
             Injection::replace(
-                "tooling/review-run/src/requirements.rs",
+                "tooling/review-eval/src/requirements.rs",
                 "[workdir.join(SRS), workdir.join(PR_HEAD).join(SRS)]",
                 "[workdir.join(SRS), workdir.join(SRS).join(PR_HEAD)]",
             ),
             cargo_lib_test(
-                "review-run",
+                "review-eval",
                 "requirements::tests::the_ids_are_main_s_and_the_pull_request_s_and_the_invariants",
             ),
             "the_ids_are_main_s_and_the_pull_request_s_and_the_invariants",
@@ -180,6 +180,42 @@ pub(super) fn review_run_report_cases() -> Vec<Case> {
                 "outcome::tests::a_blocking_finding_kept_from_a_requirement_request_stays_a_nit",
             ),
             "a_blocking_finding_kept_from_a_requirement_request_stays_a_nit",
+        ),
+    ]
+}
+
+/// The drifts the evaluation's hold on a finding's ids exists to catch
+/// (ENG-32): a grader that holds them to their shape alone, and a run
+/// graded without the ids of its world.
+pub(super) fn review_ids_grading_cases() -> Vec<Case> {
+    vec![
+        case(
+            "the grader holding a finding's ids to their shape, not to the requirements of its world",
+            "ENG-32",
+            Injection::replace(
+                "tooling/review-eval/src/grade.rs",
+                "split_with(&assemble(&log.texts, &log.answer, None), Some(known))",
+                "split_with(&assemble(&log.texts, &log.answer, None), Some(known).filter(|_| false))",
+            ),
+            cargo_lib_test(
+                "review-eval",
+                "grade::tests::ids::a_finding_that_cites_an_id_no_requirement_has_fails_its_run_as_the_review_refuses_it",
+            ),
+            "a_finding_that_cites_an_id_no_requirement_has_fails_its_run_as_the_review_refuses_it",
+        ),
+        case(
+            "an evaluation run graded without the ids of its world",
+            "ENG-32",
+            Injection::replace(
+                "tooling/review-eval/src/cli.rs",
+                "let known = requirements::ids(&world.main)?;",
+                "let known = requirements::ids(&world.main).map(|_| review_gate::report::invariants())?;",
+            ),
+            cargo_lib_test(
+                "review-eval",
+                "cli::tests::ids::run_passes_a_run_whose_finding_cites_an_id_its_world_has_and_the_invariants_lack",
+            ),
+            "run_passes_a_run_whose_finding_cites_an_id_its_world_has_and_the_invariants_lack",
         ),
     ]
 }

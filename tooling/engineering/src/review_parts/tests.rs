@@ -169,3 +169,29 @@ fn the_stand_in_s_silent_part_logs_a_result_alone_and_fails_with_nowhere_to_log(
     let ran = review_eval::log::parse(&fs::read_to_string(&log).unwrap());
     assert!(!ran.ran(), "{ran:?}");
 }
+
+/// The gate's error for a review that left out lang-rust and
+/// test-engineer-unit, each with its reason when it has one.
+fn unconsulted(whys: [Option<&str>; 2]) -> String {
+    let agents = ["lang-rust", "test-engineer-unit"].into_iter().zip(whys);
+    let agents = agents.map(|(agent, why)| review_gate::LeftOut {
+        agent: agent.to_owned(),
+        why: why.map(str::to_owned),
+    });
+
+    review_gate::Error::Unconsulted(agents.collect()).to_string()
+}
+
+#[test]
+fn the_gate_s_error_names_an_agent_left_out_alone_or_with_why_it_did_not_run() {
+    let alone = unconsulted([None, None]);
+    let with_why = unconsulted([Some("silent: a, b"), Some("part 2 of 3: silent: no log")]);
+
+    for error in [&alone, &with_why] {
+        assert!(left_out(error, "lang-rust"), "{error}");
+        assert!(left_out(error, "test-engineer-unit"), "{error}");
+        assert!(!left_out(error, "test-engineer"), "{error}");
+        assert!(!left_out(error, "review-code"), "{error}");
+    }
+    assert!(!left_out("review: lang-rust has no report", "lang-rust"));
+}

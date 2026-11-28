@@ -9,8 +9,10 @@
 //! repository tooling and never links into a shipped executable.
 
 pub mod cli;
+pub mod left_out;
 pub mod report;
 
+pub use left_out::LeftOut;
 pub use report::report_check;
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -36,6 +38,9 @@ pub const REQUEST_CHANGES: &str = "REQUEST_CHANGES";
 /// The check the post job posts with the gate's decision (ENG-28),
 /// which main's ruleset requires from the reviewer app alone (ENG-21).
 pub const OWN_CHECK: &str = "review-gate";
+/// Where a finding about the review itself points: the review's own
+/// directory, not a file of the change.
+pub const REVIEW_PATH: &str = "review/";
 /// The reviewer app, `jeduden-review-agent`, by its GitHub App id.
 pub const REVIEWER_APP_ID: i64 = 5_140_085;
 
@@ -143,8 +148,9 @@ pub enum Error {
     Consulted(serde_json::Error),
     /// The list of agents the review consulted holds an empty name.
     UnnamedAgent,
-    /// The review left these dispatched agents out.
-    Unconsulted(Vec<String>),
+    /// The review left these dispatched agents out, each with why it
+    /// did not run when the review outcome says.
+    Unconsulted(Vec<LeftOut>),
     /// The dispatch names an agent whose name is not lowercase letters,
     /// digits and hyphens, so it cannot name a report file.
     AgentName(String),
@@ -174,7 +180,7 @@ impl fmt::Display for Error {
             Self::Unconsulted(agents) => write!(
                 f,
                 "review: dispatched but not consulted: {}",
-                agents.join(", ")
+                left_out::listed(agents)
             ),
             Self::AgentName(name) => write!(f, "review: malformed dispatch: agent name {name:?}"),
             Self::Answers(source) => write!(f, "review: malformed agents' answers: {source}"),
@@ -382,11 +388,8 @@ pub fn decide(input: &Input) -> Result<Option<Review>, Error> {
     if input.head != input.reviewed {
         return Ok(None);
     }
-    let left_out: Vec<String> = input
-        .dispatched
-        .difference(&input.consulted)
-        .cloned()
-        .collect();
+    let left_out = input.dispatched.difference(&input.consulted).cloned();
+    let left_out = left_out::left_out(left_out, &input.outcome.findings);
     if !left_out.is_empty() {
         return Err(Error::Unconsulted(left_out));
     }

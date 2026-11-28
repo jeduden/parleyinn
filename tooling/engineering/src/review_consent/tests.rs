@@ -163,7 +163,7 @@ fn a_file_the_bundle_did_not_write_is_named() {
 fn a_bundle_that_wrote_no_context_is_named() {
     let (without, with) = sound();
     assert_eq!(
-        contexts(with.path()),
+        contexts(with.path()).unwrap(),
         [format!("{CONTEXTS}/lang-markdown.md")]
     );
     fs::remove_dir_all(without.path().join(CONTEXTS)).unwrap();
@@ -178,7 +178,7 @@ fn a_bundle_that_wrote_no_context_is_named() {
             without.path().join(CONTEXTS).display()
         )]
     );
-    assert!(contexts(without.path()).is_empty());
+    assert!(contexts(without.path()).unwrap().is_empty());
 }
 
 #[test]
@@ -216,4 +216,21 @@ fn a_findings_file_that_does_not_parse_is_named_and_lifts_nothing() {
             "{problems:?}"
         );
     }
+}
+
+#[test]
+fn a_context_directory_that_does_not_read_is_named_with_its_error() {
+    let (without, with) = sound();
+    let dir = with.path().join(CONTEXTS);
+    fs::remove_dir_all(&dir).unwrap();
+    fs::write(&dir, "not a directory").unwrap();
+
+    let cause = fs::read_dir(&dir).unwrap_err();
+
+    let problems = differences(without.path(), with.path());
+
+    assert!(
+        problems.contains(&format!("read {}: {cause}", dir.display())),
+        "{problems:?}"
+    );
 }

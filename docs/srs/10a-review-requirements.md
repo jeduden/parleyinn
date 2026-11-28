@@ -132,18 +132,27 @@ MUST on a missing or malformed review outcome, deterministic findings, dispatch
 or credential; a review whose agents all ran MUST reach it as the outcome
 decided it, a range a specialist did not read, a line that does not read and a
 finding citing an id no requirement has among its blocking findings.
-The tool MUST pass each agent's run the cost cap of its tier and start a run
-only once its tier's cap fits in the pull request's cap, 5 US dollars counted
-over all of its reviews, beside what its earlier reviews spent, which the tool
-takes as an input, what the runs of this review that ended were charged, a run
-paid for that left no result charged its tier's cap and one whose result
-reported no cost charged nothing, and the tier caps of the runs still running, a
-run that does not fit waiting for them and not starting once it cannot fit, and
-once more than a third of the dispatched specialists, counted in whole numbers
-and those a cost cap stopped or kept from starting among them, ended without an
-accepted report it MUST start no generalist and open the review outcome with a
-blocking finding naming that mass failure; a specialist that stated its report
-and read only part of its diff did not fail, and MUST NOT count toward it.
+That step, failing without deciding, MUST post that check failed with its own
+error in the summary, which MUST name each dispatched agent that did not run
+with the reason the review outcome gives, and, where a cost cap kept one from
+starting, what the pull request's reviews cost, the cap and how what they spent
+is reset, by deleting what the workflow keeps of each review's spend.
+The tool MUST pass each agent's run a cost cap, its tier's, and start a run only
+once that cap fits in the pull request's cap, 5 US dollars counted over all of
+its reviews, beside what its earlier reviews spent, which the tool takes as an
+input, what the runs of this review that ended were charged, a run paid for that
+left no result charged the cap it was passed and one whose result reported no
+cost charged nothing, and the caps of the runs still running, a run that does
+not fit waiting for them and not starting once it cannot fit; a generalist's run
+whose tier's cap can no longer fit, whatever the runs still running cost, MUST
+start all the same once half its tier's cap is left, unless the mass failure
+below has happened, and MUST be passed what is left as its cap, so no run spends
+past the pull request's cap; and once more than a third of the dispatched
+specialists, counted in whole numbers and those a cost cap stopped or kept from
+starting among them, ended without an accepted report it MUST start no
+generalist and open the review outcome with a blocking finding naming that mass
+failure; a specialist that stated its report and read only part of its diff did
+not fail, and MUST NOT count toward it.
 The tool MUST write beside the review outcome each dispatched agent, or part of
 one, not reviewed whole, one that did not run, read only part of its diff,
 stated a line that does not read or was left without an accepted answer, and

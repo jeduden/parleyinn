@@ -65,8 +65,12 @@ pub struct RunLog {
     pub resulted: bool,
     /// The result's subtype, or `none` without a result.
     pub subtype: String,
-    /// The final answer's text.
+    /// The final answer's text; empty when the result was an error.
     pub answer: String,
+    /// What the harness said in place of an answer when its result was
+    /// an error, whole: a usage limit, or a call the model's API
+    /// refused. It is the harness's text, never read as the agent's.
+    pub error: String,
     pub cost: f64,
     pub turns: usize,
     pub duration_ms: u64,
@@ -267,7 +271,8 @@ impl Reading {
             // The harness reports its own refusal, such as a usage limit,
             // as a successful result that is an error: name the refusal.
             Some(SUCCESS) if is_error => {
-                format!("error: {}", log.answer.lines().next().unwrap_or_default())
+                log.error = std::mem::take(&mut log.answer);
+                format!("error: {}", log.error.lines().next().unwrap_or_default())
             }
             Some(subtype) => subtype.to_owned(),
             None => "unknown".to_owned(),

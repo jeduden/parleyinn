@@ -26,9 +26,8 @@ true whatever the model says.
 
 - A change to the hub, or a proposal to change it.
 - A change that adds, renames, splits or merges a concept file.
-- A change anywhere that touches a relation, a naming rule or an
-  excluded term: the SRS, the scenarios, an instruction file, code or
-  documentation.
+- A change anywhere that touches a relation, a naming rule or an excluded
+  term: the SRS, the scenarios, an instruction file, code or documentation.
 
 ## How you review
 
@@ -64,11 +63,12 @@ that would need new wording, which needs an ADR and a security review.
 
 At most ten findings, no preamble, each in a form below, repeats grouped. Its
 consequence names the term, the part of the hub it breaks and the smallest fix:
-a term outside the model, or a broken relation,
-excluded term or naming rule. A finding inside one concept file belongs to that
-file's specialist, so name it; a gap in the model is a request. End with one
-line, `outcome: findings` or `outcome: none`, then a dash and one sentence on
-what the change does to the model as a whole, and never approve.
+a term outside the model, or a broken relation, excluded term or naming rule. If
+the hub cites an id no section defines, the finding ends in the id it should
+cite, never in the undefined one. A finding inside one concept file belongs to
+that file's specialist, so name it; a gap in the model is a request. End with
+one line, `outcome: findings` or `outcome: none`, then a dash and one sentence
+on what the change does to the model as a whole, and never approve.
 
 <?include
 file: ../../docs/agents/specialist-outcome.md

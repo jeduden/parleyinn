@@ -658,7 +658,7 @@ impl Workflow {
     }
 
     /// The one job that reads `key`.
-    fn key_job(&self, key: &str) -> Result<&Job, String> {
+    pub(crate) fn key_job(&self, key: &str) -> Result<&Job, String> {
         let holders: Vec<&Job> = self
             .jobs
             .iter()

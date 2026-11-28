@@ -14,6 +14,9 @@ use std::sync::{Condvar, Mutex, MutexGuard, PoisonError};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
+use review_eval::component::Kind;
+use review_eval::runner;
+
 use crate::live::Live;
 
 /// The cost cap of a pull request, counted over all of its reviews,
@@ -25,8 +28,8 @@ pub const PULL_REQUEST_COST_USD: f64 = 5.0;
 /// than a third, exactly one third not tripping it.
 pub const BREAKER_FRACTION: Fraction = Fraction { num: 1, den: 3 };
 /// How a gap's reason starts for a run the cost caps stopped or kept
-/// from starting.
-pub const OVER_BUDGET: &str = "over budget:";
+/// from starting: the word the review gate reads it by.
+pub const OVER_BUDGET: &str = review_gate::left_out::OVER_BUDGET;
 /// How a gap's reason starts for a generalist the breaker kept from
 /// starting.
 pub const ABORTED: &str = "aborted:";
@@ -105,13 +108,54 @@ pub fn unit(bits: u64) -> f64 {
     f64::from(millionths) / 1_000_000.0
 }
 
+/// What a run asks of the pull request's cost cap: `most`, its tier's
+/// cap, and `least`, its tier's reserve, the least of the cap that must
+/// be left for it to start. A bare number asks for a whole cap.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Need {
+    pub most: f64,
+    pub least: f64,
+}
+
+impl From<f64> for Need {
+    fn from(most: f64) -> Self {
+        Self { most, least: most }
+    }
+}
+
+impl Need {
+    /// What a run of an agent of `kind` asks: its tier's cap, and its
+    /// tier's reserve at least.
+    #[must_use]
+    pub fn of(kind: Kind) -> Self {
+        Self {
+            most: runner::budget_of(kind),
+            least: runner::reserve_of(kind),
+        }
+    }
+
+    /// How a refusal names the run.
+    fn named(self) -> String {
+        if self.least < self.most {
+            format!(
+                "a run capped at {:.2} USD, which starts with {:.2} USD at least,",
+                self.most, self.least
+            )
+        } else {
+            format!("a run capped at {:.2} USD", self.most)
+        }
+    }
+}
+
 /// The pull request's cost cap, what its earlier reviews spent, what
-/// this review's finished runs were charged, and the tier caps of its
-/// runs in flight, reserved until each ends. A run starts only once its
-/// own tier's cap fits beside all of those, so runs started together
-/// can never spend past the cap; one that does not fit waits for runs
-/// in flight to end, and is refused once it cannot fit whatever they
-/// cost.
+/// this review's finished runs were charged, and what its runs in
+/// flight hold, reserved until each ends. A run holds its tier's cap
+/// once that fits beside all of those. Once its tier's cap can no
+/// longer fit whatever the runs in flight cost, it holds what is left,
+/// when that is its tier's reserve at least, and is capped at what it
+/// holds. So runs started together can never spend past the cap; one
+/// that does not fit waits for runs in flight to end, and is refused
+/// once not even its reserve can fit whatever they cost.
 #[derive(Debug)]
 pub struct Budget {
     cap: f64,
@@ -155,60 +199,81 @@ impl Budget {
         self.before + own <= self.cap + SLACK
     }
 
-    /// Whether a run whose tier caps it at `most` US dollars may start
-    /// now: its cap fits beside what was spent and what the runs in
-    /// flight hold.
-    #[must_use]
-    pub fn fits(&self, most: f64) -> bool {
-        let ledger = self.lock();
-        self.within(ledger.spent + ledger.reserved + most)
+    /// What a run that asks `need` may hold now, in US dollars: its
+    /// tier's cap when that fits beside what was spent and what the
+    /// runs in flight hold; what is left, in whole cents, when its cap
+    /// can never fit again and its reserve does; none while it must
+    /// wait.
+    fn room(&self, ledger: &Ledger, need: Need) -> Option<f64> {
+        if self.within(ledger.spent + ledger.reserved + need.most) {
+            return Some(need.most);
+        }
+        let left = self.cap + SLACK - self.before - ledger.spent - ledger.reserved;
+        let left = (left * 100.0).floor() / 100.0;
+
+        (!self.within(ledger.spent + need.most) && left >= need.least).then_some(left)
     }
 
-    /// Why a run capped at `most` US dollars may never start: its cap
-    /// does not fit beside what was spent, whatever the runs in flight
+    /// Whether a run that asks `need` may start now: [`Budget::reserve`]
+    /// would not wait.
+    #[must_use]
+    pub fn fits(&self, need: impl Into<Need>) -> bool {
+        self.room(&self.lock(), need.into()).is_some()
+    }
+
+    /// Why a run that asks `need` may never start: not even its
+    /// reserve fits beside what was spent, whatever the runs in flight
     /// cost; none while it may.
     #[must_use]
-    pub fn refusal(&self, most: f64) -> Option<String> {
-        self.refused(&self.lock(), most)
+    pub fn refusal(&self, need: impl Into<Need>) -> Option<String> {
+        self.refused(&self.lock(), need.into())
     }
 
-    fn refused(&self, ledger: &Ledger, most: f64) -> Option<String> {
-        (!self.within(ledger.spent + most)).then(|| {
+    fn refused(&self, ledger: &Ledger, need: Need) -> Option<String> {
+        (!self.within(ledger.spent + need.least)).then(|| {
             format!(
-                "{OVER_BUDGET} the pull request's reviews cost {:.4} USD, and a run capped at \
-                 {most:.2} USD does not fit in its cap of {:.2} USD, so it was not started",
+                "{OVER_BUDGET} the pull request's reviews cost {:.4} USD, and {} does not fit \
+                 in its cap of {:.2} USD, so it was not started",
                 self.before + ledger.spent,
+                need.named(),
                 self.cap
             )
         })
     }
 
-    /// Reserves `most` US dollars for a run about to start, once its
-    /// cap fits: while runs in flight hold what it needs it waits for
-    /// one to end, and once it cannot fit whatever they cost, or `wait`
-    /// passed with no room, it is refused, why given. The reservation
-    /// is released when the [`Reservation`] is charged or dropped, a run
-    /// that unwinds included, so no wait outlives the run it waits on.
+    /// Reserves what a run about to start may spend, once `need`
+    /// fits: its tier's cap, or what is left once that can never fit
+    /// again and its reserve does. While runs in flight hold what it
+    /// needs it waits for one to end, and once not even its reserve
+    /// can fit whatever they cost, or `wait` passed with no room, it is
+    /// refused, why given. The reservation is released when the
+    /// [`Reservation`] is charged or dropped, a run that unwinds
+    /// included, so no wait outlives the run it waits on.
     ///
     /// # Errors
     ///
     /// Fails, saying why, when the run may not start.
-    pub fn reserve(&self, most: f64, wait: Duration) -> Result<Reservation<'_>, String> {
+    pub fn reserve(
+        &self,
+        need: impl Into<Need>,
+        wait: Duration,
+    ) -> Result<Reservation<'_>, String> {
+        let need = need.into();
         let since = Instant::now();
         let mut ledger = self.lock();
         loop {
-            if let Some(why) = self.refused(&ledger, most) {
+            if let Some(why) = self.refused(&ledger, need) {
                 return Err(why);
             }
             // Not refused, so what does not fit is held by runs in
             // flight, each of which ends and wakes this wait.
-            if self.within(ledger.spent + ledger.reserved + most) {
+            if let Some(most) = self.room(&ledger, need) {
                 ledger.reserved += most;
                 return Ok(Reservation { budget: self, most });
             }
             let left = wait.saturating_sub(since.elapsed());
             if left.is_zero() {
-                return Err(self.waited(most, wait));
+                return Err(self.waited(need, wait));
             }
             ledger = self
                 .freed
@@ -218,13 +283,13 @@ impl Budget {
         }
     }
 
-    /// Why a run capped at `most` US dollars was refused once it waited
-    /// `wait` for room.
-    fn waited(&self, most: f64, wait: Duration) -> String {
+    /// Why a run that asks `need` was refused once it waited `wait`
+    /// for room.
+    fn waited(&self, need: Need, wait: Duration) -> String {
         format!(
-            "{OVER_BUDGET} a run capped at {most:.2} USD waited {:.2} s for the runs in flight to \
-             leave room in the pull request's cap of {:.2} USD, and they did not end, so it was \
-             not started",
+            "{OVER_BUDGET} {} waited {:.2} s for the runs in flight to leave room in the pull \
+             request's cap of {:.2} USD, and they did not end, so it was not started",
+            need.named(),
             wait.as_secs_f64(),
             self.cap
         )
@@ -260,6 +325,13 @@ pub struct Reservation<'a> {
 }
 
 impl Reservation<'_> {
+    /// What the run may spend, in US dollars: the cost cap it is
+    /// passed.
+    #[must_use]
+    pub fn held(&self) -> f64 {
+        self.most
+    }
+
     /// Charges the run that ended `cost` and hands `keep` what this
     /// review was charged so far, its own spend alone, while no other
     /// run's cost is added, so what it keeps never goes back; then
