@@ -79,7 +79,7 @@ pub(super) fn architecture_cases() -> Vec<Case> {
             "ENG-02",
             Injection::replace(
                 "tooling/srs/Cargo.toml",
-                "responsibility = \"Reads the SRS requirement tables, appendices and personas for the gates\"\n",
+                "responsibility = \"Reads the SRS requirement blocks, appendices and personas for the gates\"\n",
                 "",
             ),
             scenario("ENG-02"),

@@ -1,7 +1,7 @@
 Feature: Engineering quality (ENG)
 
   The scenarios for SRS §10, one per requirement, tagged with its id and
-  priority; the engineering tables carry no Traces column. A scenario
+  priority; the engineering requirements carry no Traces field. A scenario
   still tagged @pending is declared but not yet written: its steps are
   bound when the plan that implements the requirement lands. The
   scenarios without @pending inspect the repository itself and run on
@@ -241,6 +241,8 @@ Feature: Engineering quality (ENG)
     And commits must be signed
     And every pull request needs an approval from a reviewer other than its author
     And every pull request needs the "review-gate" check, taken from the reviewer app alone
+    And the review workflow's review job and its evaluation's job check the head out with its history and have git merge it into main before the review bundle, the evaluation plan or the cases read it, as the local review does, none reads the head alone, and review-run is told the head, not git's merge of it
+    And git's merge of the head reads only the branch's own change of a branch that merged main and another pull request apart, once main merged that one, of a branch behind main and of a head that holds main, which it leaves as it is, and refuses a head that does not merge with main, naming the file that conflicts
     And CODEOWNERS names the stakeholder on what guides the review: the agent instructions, the review's code, cases and scorecard, CI and the merge rules, the manifests and tool pins CI builds and checks with, the bans and acceptances CI holds the code to, and the linter configuration
     And CODEOWNERS names no code owner on any other path
     And CODEOWNERS names no code owner on Rust source outside the review's crates, so any other code change needs only a reviewer other than its author
@@ -408,7 +410,7 @@ Feature: Engineering quality (ENG)
   @ENG-34 @P0
   Scenario: the review bundle flags a file past its line limit and a file no specialist reads
     Given the repository checkout
-    Then the review bundle's line limits are those the ENG-34 row states
+    Then the review bundle's line limits are those ENG-34 states
     When the review bundle is built for a change that adds a Rust file past its limit and a file no review specialist reads
     Then its deterministic findings hold a nit at the Rust file in the finding form, citing ENG-34
     And its deterministic findings hold a nit at the unread file in the finding form, citing ENG-28

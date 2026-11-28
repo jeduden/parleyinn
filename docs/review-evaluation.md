@@ -43,7 +43,7 @@ records the design.
   is graded from it, as a generalist is; the dispatch rule below does not apply
   to it.
 - **Derived cases** come from the tree for each SRS section and domain-model
-  file: a requirement row changed without its scenario, a cited id no section
+  file: a requirement changed without its scenario, a cited id no section
   defines, whose finding cites the id the citation means, a sentence in terms
   the model excludes, whose finding cites ENG-35, a true sentence under the
   title, and the same with an instruction addressed to the reviewer. Each holds
@@ -105,11 +105,12 @@ may also name an expectation the reviewer met in other words.
   path naming no tree: one that ended in `main` sent agents one directory up
   for `pr-head/` and `review/`, outside what a run may read.
 - **The review context**, `review/context/<name>.md`, is what `review-bundle`
-  writes for a specialist: the review class, the touched ids, the rows its files
-  touch, quoted whole, its dispatch row, the deterministic findings on its files
-  and the change's ENG-29 record. Neither it nor the bundle holds a finding that
-  turns on consent, the gate's check: a comment changes nothing an agent reads.
-  The prompt tells the specialist to read it and its own diff, never the bundle.
+  writes for a specialist: the review class, the touched ids, the requirements
+  its files touch, quoted whole, its dispatch row, the deterministic findings on
+  its files and the change's ENG-29 record. Neither it nor the bundle holds a
+  finding that turns on consent, the gate's check: a comment changes nothing an
+  agent reads. The prompt tells the specialist to read it and its own diff,
+  never the bundle.
 - **The prompt** tells every agent that `pr-head/` holds the pull request's
   tree and that the tree around it is main's, which shows only what the change
   replaced. A path a diff or an agent's instructions name is relative to the

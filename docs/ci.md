@@ -57,6 +57,11 @@ is short, because a finding found late costs a whole round.
   unchanged; no workflow gives it a store yet.
   A review that aborts on a mass failure of its specialists says so
   apart from any finding: fix the outage or prompt, then `--resume`.
+- The review reads the head merged into main, as landing it would leave
+  main, here and in CI: a branch that merged main and another pull
+  request apart, or one behind main, is reviewed and evaluated on its own
+  change alone. A head that does not merge with main is not reviewed, and
+  the review names the files that conflict: merge main into the branch.
 - A pull request's reviews share one cost cap, ENG-28's, 5 USD counted
   over all of them: each review keeps what it spent in a
   `review-spend-pr-<N>-a<attempt>` artifact, and the next sums every one

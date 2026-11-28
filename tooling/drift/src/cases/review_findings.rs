@@ -6,7 +6,7 @@ use super::*;
 /// The drifts ENG-34 exists to catch, late so adding them moves no
 /// earlier case to another shard: the review bundle no longer flagging
 /// a file past its limit, no longer flagging a file no specialist
-/// reads, and a limit the ENG-34 row states that the bundle does not
+/// reads, and a limit ENG-34 states that the bundle does not
 /// hold.
 pub(super) fn review_limit_cases() -> Vec<Case> {
     const LIMITS: &str = "tooling/review-bundle/src/limits.rs";
@@ -34,7 +34,7 @@ pub(super) fn review_limit_cases() -> Vec<Case> {
             "no nit at LICENSE in the finding form citing ENG-28",
         ),
         case(
-            "the ENG-34 row stating a limit the review bundle does not hold",
+            "ENG-34 stating a limit the review bundle does not hold",
             "ENG-34",
             Injection::replace(
                 "docs/srs/10-engineering-quality.md",
@@ -42,7 +42,7 @@ pub(super) fn review_limit_cases() -> Vec<Case> {
                 "250 for TOML (`.toml`)",
             ),
             scenario("ENG-34"),
-            "the ENG-34 row states no limit of 200 for TOML, which the review bundle holds",
+            "ENG-34 states no limit of 200 for TOML, which the review bundle holds",
         ),
     ]
 }

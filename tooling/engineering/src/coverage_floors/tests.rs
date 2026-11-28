@@ -6,7 +6,7 @@ use coverage::plan::{Crate, Floors, Plan};
 use super::*;
 use crate::review_workflow;
 
-const ROW: &str = "Line coverage MUST be ≥ 90% for security-sensitive crates (`provenance`, \
+const ENG_11: &str = "Line coverage MUST be ≥ 90% for security-sensitive crates (`provenance`, \
                    `redaction`, `flag`) and ≥ 80% overall.";
 
 fn floors(all: Option<f64>) -> Floors {
@@ -43,15 +43,15 @@ fn plan(names: &[&str], default: Option<f64>, over: &[(&str, Option<f64>)]) -> P
     }
 }
 
-fn row() -> Row {
-    Row::parse(ROW).unwrap()
+fn stated() -> Stated {
+    Stated::parse(ENG_11).unwrap()
 }
 
 #[test]
-fn the_row_names_the_sensitive_crates_and_both_floors() {
+fn eng_11_names_the_sensitive_crates_and_both_floors() {
     assert_eq!(
-        row(),
-        Row {
+        stated(),
+        Stated {
             sensitive: vec!["provenance".into(), "redaction".into(), "flag".into()],
             sensitive_floor: 90.0,
             overall_floor: 80.0,
@@ -60,25 +60,25 @@ fn the_row_names_the_sensitive_crates_and_both_floors() {
 }
 
 #[test]
-fn a_row_without_its_list_or_a_floor_is_refused() {
+fn a_text_without_its_list_or_a_floor_is_refused() {
     assert_eq!(
-        Row::parse("Line coverage MUST be high."),
-        Err("the ENG-11 row names no security-sensitive crates in parentheses".to_owned())
+        Stated::parse("Line coverage MUST be high."),
+        Err("ENG-11 names no security-sensitive crates in parentheses".to_owned())
     );
     assert_eq!(
-        Row::parse("for security-sensitive crates (`a`) and overall."),
-        Err("the ENG-11 row states no floor before \"for security-sensitive crates\"".to_owned())
+        Stated::parse("for security-sensitive crates (`a`) and overall."),
+        Err("ENG-11 states no floor before \"for security-sensitive crates\"".to_owned())
     );
     assert_eq!(
-        Row::parse("≥ 90% for security-sensitive crates (`a`) and overall."),
-        Err("the ENG-11 row states no floor before \"overall\"".to_owned())
+        Stated::parse("≥ 90% for security-sensitive crates (`a`) and overall."),
+        Err("ENG-11 states no floor before \"overall\"".to_owned())
     );
 }
 
 #[test]
-fn a_built_sensitive_crate_held_to_a_floor_at_or_above_the_row_s_passes() {
+fn a_built_sensitive_crate_held_to_a_floor_at_or_above_eng_11_s_passes() {
     let p = plan(&["provenance", "redaction", "store"], Some(100.0), &[]);
-    assert!(sensitive_problems(&p, &row()).is_empty());
+    assert!(sensitive_problems(&p, &stated()).is_empty());
 }
 
 #[test]
@@ -89,12 +89,12 @@ fn a_sensitive_crate_held_lower_or_to_no_floor_is_named() {
         &[("provenance", Some(85.0))],
     );
     assert_eq!(
-        sensitive_problems(&p, &row()),
+        sensitive_problems(&p, &stated()),
         vec!["provenance is held to 85% of its lines, below ENG-11's 90%".to_owned()]
     );
     let none = plan(&["redaction"], None, &[]);
     assert_eq!(
-        sensitive_problems(&none, &row()),
+        sensitive_problems(&none, &stated()),
         vec!["redaction is held to no floor over every test layer".to_owned()]
     );
 }
@@ -103,7 +103,7 @@ fn a_sensitive_crate_held_lower_or_to_no_floor_is_named() {
 fn the_built_sensitive_crates_are_listed_and_the_rest_named_as_not_yet_built() {
     let p = plan(&["provenance", "store"], Some(100.0), &[]);
     assert_eq!(
-        built(&p, &row()),
+        built(&p, &stated()),
         (
             vec!["provenance".to_owned()],
             vec!["redaction".to_owned(), "flag".to_owned()]
@@ -118,15 +118,15 @@ fn every_crate_at_the_overall_floor_holds_the_whole_workspace_to_it() {
         Some(100.0),
         &[("store", Some(80.0))],
     );
-    assert!(overall_problems(&p, &row()).is_empty());
+    assert!(overall_problems(&p, &stated()).is_empty());
     let low = plan(&["store"], Some(100.0), &[("store", Some(79.5))]);
     assert_eq!(
-        overall_problems(&low, &row()),
+        overall_problems(&low, &stated()),
         vec!["store is held to 79.5% of its lines, below ENG-11's 80% overall".to_owned()]
     );
     let none = plan(&["store"], None, &[]);
     assert_eq!(
-        overall_problems(&none, &row()),
+        overall_problems(&none, &stated()),
         vec!["store is held to no floor over every test layer".to_owned()]
     );
 }

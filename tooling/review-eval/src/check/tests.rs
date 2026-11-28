@@ -325,18 +325,18 @@ fn a_derived_change_to_a_section_is_read_through_a_scratch_copy() {
     let base = Snapshot::read(dir.path()).unwrap();
     let component = component::load(dir.path(), "srs-05").unwrap();
     let cases = derived::cases(dir.path()).unwrap();
-    let row = cases
+    let defect = cases
         .iter()
-        .find(|c| c.id() == "srs-05/defect-row-without-scenario")
+        .find(|c| c.id() == "srs-05/defect-requirement-without-scenario")
         .unwrap();
 
-    assert_eq!(dispatches(dir.path(), &base, row, &component), Ok(None));
+    assert_eq!(dispatches(dir.path(), &base, defect, &component), Ok(None));
 
     let generalist = component::load(dir.path(), "review-spec-deep").unwrap();
-    assert_eq!(dispatches(dir.path(), &base, row, &generalist), Ok(None));
+    assert_eq!(dispatches(dir.path(), &base, defect, &generalist), Ok(None));
     let other = component::load(dir.path(), "review-code").unwrap();
     assert!(
-        dispatches(dir.path(), &base, row, &other)
+        dispatches(dir.path(), &base, defect, &other)
             .unwrap()
             .is_some()
     );

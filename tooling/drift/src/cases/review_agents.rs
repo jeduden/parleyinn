@@ -64,8 +64,8 @@ pub(super) fn review_reach_cases() -> Vec<Case> {
             "ENG-28",
             Injection::replace(
                 REVIEW_WORKFLOW,
-                "            ${PREVIOUS:+--previous \"$PREVIOUS\"} > review/run.txt\n",
-                "            ${PREVIOUS:+--previous \"$PREVIOUS\"} > review/run.txt\n          ./review/agents.sh -p review --allowedTools Write\n",
+                "            --head-sha \"$HEAD_SHA\" ${PREVIOUS:+--previous \"$PREVIOUS\"} > review/run.txt\n",
+                "            --head-sha \"$HEAD_SHA\" ${PREVIOUS:+--previous \"$PREVIOUS\"} > review/run.txt\n          ./review/agents.sh -p review --allowedTools Write\n",
             ),
             scenario("ENG-28"),
             "may use Write, want Read, Glob, Grep alone",
@@ -75,7 +75,7 @@ pub(super) fn review_reach_cases() -> Vec<Case> {
             "ENG-28",
             Injection::replace(
                 REVIEW_WORKFLOW,
-                "          cargo run --locked --quiet --offline -p review-run -- --workdir . --parallel 32 \\\n            --credential \"$RUNNER_TEMP/claude-credential\" --spent-before \"$SPENT\" \\\n            ${PREVIOUS:+--previous \"$PREVIOUS\"} > review/run.txt\n",
+                "          cargo run --locked --quiet --offline -p review-run -- --workdir . --parallel 32 \\\n            --credential \"$RUNNER_TEMP/claude-credential\" --spent-before \"$SPENT\" \\\n            --head-sha \"$HEAD_SHA\" ${PREVIOUS:+--previous \"$PREVIOUS\"} > review/run.txt\n",
                 "          echo routed\n      - uses: anthropics/claude-code-action@0000000000000000000000000000000000000000\n",
             ),
             scenario("ENG-28"),
@@ -297,23 +297,24 @@ pub(super) fn review_evaluation_cases() -> Vec<Case> {
     ]
 }
 
-/// The drifts between ENG-29's row and the rows I2 and I4 rest on: the
-/// guard reads the guarded rows from ENG-29's text, so a row it does not
-/// name is changed with no record. One drops the row I4's boundaries
-/// rest on from ENG-29's row; the other has I2 name a requirement
-/// ENG-29's row lacks. Each failure names the row. Registered late, so
-/// adding them moves no earlier case to another shard.
-pub(super) fn eng_29_row_cases() -> Vec<Case> {
+/// The drifts between ENG-29 and the requirements I2 and I4 rest on:
+/// the guard reads the guarded requirements from ENG-29's text, so one
+/// it does not name is changed with no record. One drops the
+/// requirement I4's boundaries rest on from ENG-29; the other has I2
+/// name a requirement ENG-29 lacks. Each failure names the requirement.
+/// Registered late, so adding them moves no earlier case to another
+/// shard.
+pub(super) fn eng_29_requirement_cases() -> Vec<Case> {
     let check = || {
         cargo_test(
             "review-bundle",
             "bundle",
-            "the_rows_i2_and_i4_rest_on_are_guarded_by_eng_29",
+            "the_requirements_i2_and_i4_rest_on_are_guarded_by_eng_29",
         )
     };
     vec![
         case(
-            "ENG-29 no longer naming a row I4's boundaries rest on",
+            "ENG-29 no longer naming a requirement I4's boundaries rest on",
             "ENG-29",
             Injection::replace(
                 "docs/srs/10-engineering-quality.md",
@@ -321,10 +322,10 @@ pub(super) fn eng_29_row_cases() -> Vec<Case> {
                 "OWN-29), to one",
             ),
             check(),
-            "SEC-01: ENG-29's row must name it",
+            "SEC-01: ENG-29 must name it",
         ),
         case(
-            "I2 naming a requirement ENG-29's row lacks",
+            "I2 naming a requirement ENG-29 lacks",
             "ENG-29",
             Injection::replace(
                 "docs/srs/invariants.md",
@@ -332,7 +333,7 @@ pub(super) fn eng_29_row_cases() -> Vec<Case> {
                 "(INJ-01, INJ-02, INJ-04, INJ-05)",
             ),
             check(),
-            "INJ-05: ENG-29's row must name it",
+            "INJ-05: ENG-29 must name it",
         ),
     ]
 }
@@ -399,9 +400,9 @@ pub(super) fn review_gate_cases() -> Vec<Case> {
             cargo_test(
                 "review-bundle",
                 "bundle",
-                "the_requirements_eng_29_marks_follow_its_row",
+                "the_requirements_eng_29_marks_follow_its_text",
             ),
-            "---- the_requirements_eng_29_marks_follow_its_row stdout ----",
+            "---- the_requirements_eng_29_marks_follow_its_text stdout ----",
         ),
         // The shared sections no longer a stakeholder path, a change to
         // one routes light; the failure prints the class the bundle chose.

@@ -1,7 +1,7 @@
 [package]
 name = "srs"
 version = "0.0.0"
-description = "Reads the SRS requirement tables, Appendix B and C and the §2.5 personas for the gates"
+description = "Reads the SRS requirement blocks, Appendix B and C and the §2.5 personas for the gates"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -17,6 +17,6 @@ workspace = true
 
 # ENG-02: see crates/parinn/Cargo.toml.
 [package.metadata.parinn]
-responsibility = "Reads the SRS requirement tables, appendices and personas for the gates"
+responsibility = "Reads the SRS requirement blocks, appendices and personas for the gates"
 may-depend-on = []
 may-dev-depend-on = ["testkit"]

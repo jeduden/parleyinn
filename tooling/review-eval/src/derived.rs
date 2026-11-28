@@ -42,9 +42,9 @@ pub const EXCLUDED_SENTENCE: &str =
 /// finding cites: a finding is known by what the report's form fixes,
 /// its place and its ids, never by a word of its sentence.
 pub const TERMS_ID: &str = "ENG-35";
-/// What a derived defect adds to a requirement: to the end of a row's
-/// text, or on a line of its own after a block's.
-pub const ADDED_MUST: &str = " It MUST also record the change in the audit log.";
+/// What a derived defect adds to a requirement: a line of its own after
+/// its block's text.
+pub const ADDED_MUST: &str = "It MUST also record the change in the audit log.";
 
 /// The prefix of an open question's id, which is no requirement's: the
 /// report rule refuses it among a finding's ids.
@@ -158,7 +158,7 @@ fn section(root: &Path, path: &str, name: &str) -> Result<Vec<Case>, String> {
     let text = read(root, path)?;
     let title = title_line(path, &text)?;
     let defect = match first_requirement(&text) {
-        Some((old, new, id)) => row_without_scenario(name, path, old, new, &id),
+        Some((old, new, id)) => requirement_without_scenario(name, path, old, new, &id),
         None => excluded_terms(name, path, &title),
     };
 
@@ -204,40 +204,14 @@ fn title_line(path: &str, text: &str) -> Result<String, String> {
         .ok_or_else(|| format!("{path} has no title line"))
 }
 
-/// The first requirement row of a section, outside a code fence: its
-/// line and its id.
-fn first_row(text: &str) -> Option<(String, String)> {
-    unfenced(text).find_map(|(_, line)| {
-        let cells: Vec<&str> = line.split('|').map(str::trim).collect();
-        let id = cells.get(1)?;
-        (cells.len() >= 5
-            && srs_id(id)
-            && !id.starts_with(OPEN_QUESTION)
-            && cells.get(2).is_some_and(|p| p.starts_with('P')))
-        .then(|| (format!("{line}\n"), (*id).to_owned()))
-    })
-}
-
-/// The first requirement of a section with a priority, its first row
-/// or its first block, whichever comes first: what it reads, what it
-/// reads with the MUST added, and its id. A row takes the MUST at the
-/// end of its text cell, a block on a line of its own after its text.
+/// The first requirement of a section with a priority, its first block:
+/// what it reads, what it reads with the MUST added on a line of its own
+/// after its text, and its id.
 fn first_requirement(text: &str) -> Option<(String, String, String)> {
-    let row = first_row(text).map(|(line, id)| {
-        let mut cells: Vec<String> = line.trim_end().split('|').map(str::to_owned).collect();
-        cells[3] = format!("{}{ADDED_MUST} ", cells[3].trim_end());
-        let new = format!("{}\n", cells.join("|"));
-        (line, new, id)
-    });
-    let block = first_block(text).map(|(block, id)| {
-        let new = format!("{block}{}\n", ADDED_MUST.trim_start());
+    first_block(text).map(|(block, id)| {
+        let new = format!("{block}{ADDED_MUST}\n");
         (block, new, id)
-    });
-
-    [row, block]
-        .into_iter()
-        .flatten()
-        .min_by_key(|(old, _, _)| text.find(old.as_str()))
+    })
 }
 
 /// The first block of a section with a priority in its field list,
@@ -369,7 +343,7 @@ fn first_requirement_id(text: &str) -> Option<String> {
 
 /// A case of `kind` for `name` on `path` with `edits` and `expect`,
 /// held to the pull request's tree: what a specialist looks up beyond
-/// its diff, a row, a scenario or a concept, it reads there.
+/// its diff, a requirement, a scenario or a concept, it reads there.
 fn case(
     name: &str,
     case_name: &str,
@@ -406,11 +380,17 @@ fn under_title(path: &str, title: &str, sentence: &str) -> Edit {
 
 /// A MUST added to the requirement `id`, which reads `old` and with
 /// the MUST `new`, with no change to its scenario: the specialist's
-/// check of each touched row against its scenario.
-fn row_without_scenario(name: &str, path: &str, old: String, new: String, id: &str) -> Case {
+/// check of each touched requirement against its scenario.
+fn requirement_without_scenario(
+    name: &str,
+    path: &str,
+    old: String,
+    new: String,
+    id: &str,
+) -> Case {
     case(
         name,
-        "defect-row-without-scenario",
+        "defect-requirement-without-scenario",
         "defect",
         &format!("a MUST added to {id} with no change to its scenario"),
         vec![Edit::Replace {

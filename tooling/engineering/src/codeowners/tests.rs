@@ -219,7 +219,7 @@ fn a_starred_name_stands_for_each_entry_it_matches() {
 }
 
 #[test]
-fn a_class_the_row_stops_naming_is_reported() {
+fn a_class_eng_21_stops_naming_is_reported() {
     let (_d, c) = crate::tests::checkout(&[
         ("docs/srs/index.md", INDEX),
         (
@@ -231,7 +231,7 @@ fn a_class_the_row_stops_naming_is_reported() {
 
     has(
         &stakeholder_owns_the_enforcing_paths(&c),
-        "the ENG-21 row no longer says \"the agent instructions\"",
+        "ENG-21 no longer says \"the agent instructions\"",
     );
 }
 
