@@ -1,0 +1,32 @@
+component = "lang-web"
+kind = "defect"
+title = "a page that loads an analytics script from another host"
+
+[[create]]
+file = "docs/design/mark.html"
+content = '''
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://cdn.example.com; base-uri 'none'; form-action 'none'">
+<title>ParleyInn's mark</title>
+<script src="https://cdn.example.com/analytics.js" async></script>
+</head>
+<body>
+<main>
+<h1>The mark</h1>
+<p>The sign is the mark: the name in cyan neon over one long pink key.</p>
+</main>
+</body>
+</html>
+'''
+
+[expect]
+outcome = ["findings"]
+
+[[expect.finding]]
+path = "docs/design/mark.html"
+form = "linked"
+mentions_any = ["analytics", "cdn", "another host", "third-party", "third party", "external", "host"]
