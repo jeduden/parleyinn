@@ -44,9 +44,9 @@ maps every individual concern to requirements.
    from non-Claude models. → All acceptance criteria are measured on our own
    Claude models and workloads (§11).
 8. **Redoing settled work is most of a change's wait.** In this repository's
-   own measurement (`research/notes/review-attestation/`, 26 to 28 November
-   2026), a change of three rounds is estimated at about 37 minutes, most of
-   it checks and review run again in full each round on GitHub. Running them
-   once, on the node where the agent edits, is estimated at about 23
-   minutes, and about 18 once each check names the files it reads. → The
-   reuse rule of §1.2, whose requirements plan 2611280904 adds.
+   own measurement (`research/notes/review-attestation/design-options.html`,
+   26 to 28 November 2026), a change of three rounds is estimated at 37:16,
+   most of it checks and review run again in full each round on GitHub.
+   Running them once, on the node where the agent edits, is estimated at
+   22:56, and 17:50 once each check names the files it reads. → The reuse
+   rule of §1.2, whose requirements plan 2611280904 adds.
