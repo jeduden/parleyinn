@@ -525,7 +525,7 @@ fn what_an_agent_reads_does_not_turn_on_the_stakeholder_s_comments() {
     let got = bundle(&without, &base(), &head);
 
     // A review a comment brings takes the agents' outcome as its own
-    // (ENG-28), so a comment may change nothing an agent read: a line
+    // (ENG-37), so a comment may change nothing an agent read: a line
     // that restated the missing consent would outlive the consent.
     assert_eq!(got, bundle(&with, &base(), &head));
     assert!(!got.contains("stakeholder comment"), "{got}");

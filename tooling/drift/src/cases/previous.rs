@@ -1,11 +1,11 @@
 //! The drifts of how a review carries the findings of the previous
-//! review of its pull request (ENG-28), apart from the registry's other
+//! review of its pull request (ENG-37), apart from the registry's other
 //! cases so its file grows no further.
 
 use super::case;
 use crate::{Case, Check, Injection, cargo_lib_test};
 
-/// The drifts the per-pull-request findings exist to rule out (ENG-28,
+/// The drifts the per-pull-request findings exist to rule out (ENG-37,
 /// I2, I6): an artifact of the name any workflow uploaded taken as the
 /// previous review, the findings never passed to the next review, kept
 /// under a name no pull request owns, or picked with no origin check.
@@ -35,7 +35,7 @@ fn selection_cases() -> Vec<Case> {
     vec![
         case(
             "a previous review taken from a run of any workflow, so a pull request plants its own history",
-            "ENG-28",
+            "ENG-37",
             Injection::replace(
                 PREVIOUS,
                 "file == WORKFLOW_PATH && EVENTS.contains(&self.event.as_str())",
@@ -46,7 +46,7 @@ fn selection_cases() -> Vec<Case> {
         ),
         case(
             "a previous review taken from a run on the pull request's own event",
-            "ENG-28",
+            "ENG-37",
             Injection::replace(
                 PREVIOUS,
                 "file == WORKFLOW_PATH && EVENTS.contains(&self.event.as_str())",
@@ -57,7 +57,7 @@ fn selection_cases() -> Vec<Case> {
         ),
         case(
             "a previous review taken from an artifact whose run is unknown",
-            "ENG-28",
+            "ENG-37",
             Injection::replace(
                 PREVIOUS,
                 ".is_some_and(Run::is_main_review);",
@@ -76,14 +76,14 @@ fn wiring_cases() -> Vec<Case> {
     vec![
         case(
             "a review never given the findings of the previous one",
-            "ENG-28",
+            "ENG-37",
             Injection::replace(WORKFLOW, "${PREVIOUS:+--previous \"$PREVIOUS\"}", ""),
             wiring_check(),
             "as --previous",
         ),
         case(
             "the tracked findings kept under one artifact name for every pull request",
-            "ENG-28",
+            "ENG-37",
             Injection::replace(
                 WORKFLOW,
                 "name: review-findings-pr-${{ steps.pull_head.outputs.number }}",
@@ -94,7 +94,7 @@ fn wiring_cases() -> Vec<Case> {
         ),
         case(
             "a warning among the runs' lines that stops jq and the whole fetch",
-            "ENG-28",
+            "ENG-37",
             Injection::replace(
                 "scripts/review-previous.sh",
                 "its artifact is refused\" >&2",
@@ -105,7 +105,7 @@ fn wiring_cases() -> Vec<Case> {
         ),
         case(
             "the previous findings picked with no check of the run that uploaded them",
-            "ENG-28",
+            "ENG-37",
             Injection::replace(
                 "scripts/review-previous.sh",
                 "previous select",

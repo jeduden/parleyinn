@@ -13,7 +13,7 @@ use crate::{Analysis, Change, Finding, Snapshot};
 /// What every agent is told of the stakeholder's consent, in place of
 /// the findings that turn on it ([`Analysis::on_consent`]): fixed text,
 /// the same whatever the pull request's comments say. A review a
-/// comment brings takes the agents' outcome as its own (ENG-28), so a
+/// comment brings takes the agents' outcome as its own (ENG-37), so a
 /// line that restated a missing consent would outlive the consent.
 pub const CONSENT: &str = "Whether the stakeholder consents to this change is the review gate's \
                            check, made from the pull request's comments, which are not shown \

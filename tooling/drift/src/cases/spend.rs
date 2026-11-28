@@ -1,7 +1,7 @@
 //! The drifts of how a pull request's reviews share one cost cap
-//! (ENG-28): what earlier reviews spent ignored, the total not kept or
-//! kept without them, and the workflow no longer carrying it from one
-//! review to the next; what the review gate says of a review a cost
+//! (ENG-28) and carry what each spent to the next (ENG-37): what earlier
+//! reviews spent ignored, the total not kept or kept without them, and
+//! the workflow no longer carrying it from one review to the next; what the review gate says of a review a cost
 //! cap kept agents out of; and a generalist started on what is left of
 //! the cap. Late, so adding them moves no earlier case to another
 //! shard.
@@ -14,7 +14,8 @@ const WORKFLOW: &str = ".github/workflows/review.yml";
 /// The script that fetches what earlier reviews spent.
 const SCRIPT: &str = "scripts/review-spend.sh";
 
-/// The drifts the pull request's cap exists to rule out (ENG-28, I6).
+/// The drifts the pull request's cap exists to rule out (ENG-28,
+/// ENG-37, I6).
 pub(super) fn review_spend_cases() -> Vec<Case> {
     [
         cap_cases(),
@@ -79,7 +80,7 @@ fn sum_cases() -> Vec<Case> {
     vec![
         case(
             "what earlier reviews spent listed by a name with no run attempt",
-            "ENG-28",
+            "ENG-37",
             Injection::replace(
                 SCRIPT,
                 "startswith(\\\"review-spend-pr-$PULL-a\\\")",
@@ -90,7 +91,7 @@ fn sum_cases() -> Vec<Case> {
         ),
         case(
             "previous select --of spend taking the name with no run attempt alone",
-            "ENG-28",
+            "ENG-37",
             Injection::replace(
                 "tooling/review-run/src/previous.rs",
                 ".filter(|a| is_spend_of(&a.name, pull) && !a.expired)",
@@ -101,7 +102,7 @@ fn sum_cases() -> Vec<Case> {
         ),
         case(
             "previous select --of spend summing an artifact a paged listing named twice",
-            "ENG-28",
+            "ENG-37",
             Injection::replace(
                 "tooling/review-run/src/previous.rs",
                 "    named.dedup_by_key(|a| a.id);\n",
@@ -115,7 +116,7 @@ fn sum_cases() -> Vec<Case> {
         ),
         case(
             "a run behind an earlier review's spend that cannot be looked up only warned of",
-            "ENG-28",
+            "ENG-37",
             Injection::replace(
                 SCRIPT,
                 "    || fail \"Run $id, behind",
@@ -126,14 +127,14 @@ fn sum_cases() -> Vec<Case> {
         ),
         case(
             "a rerun's spend kept under its first attempt's name",
-            "ENG-28",
+            "ENG-37",
             Injection::replace(WORKFLOW, "-a${{ github.run_attempt }}", ""),
             carry_check(),
             "no step uploads what the pull request's reviews spent",
         ),
         case(
             "a rerun's spend replacing what its first attempt kept",
-            "ENG-28",
+            "ENG-37",
             Injection::replace(
                 WORKFLOW,
                 "          path: review/spend.json\n",
@@ -144,7 +145,7 @@ fn sum_cases() -> Vec<Case> {
         ),
         case(
             "previous spend reading one file of many",
-            "ENG-28",
+            "ENG-37",
             Injection::replace(
                 "tooling/review-run/src/previous.rs",
                 ".map(|spent| sum + spent)",
@@ -163,7 +164,7 @@ fn sum_cases() -> Vec<Case> {
 fn long_lived_case() -> Case {
     case(
         "previous select --of spend refusing a long-lived pull request's hundreds of reviews",
-        "ENG-28",
+        "ENG-37",
         Injection::replace(
             "tooling/review-run/src/previous.rs",
             "pub const MAX_SPENDS: usize = 1000;",
@@ -218,7 +219,7 @@ fn cap_cases() -> Vec<Case> {
         ),
         case(
             "review-run keeping a run's cost twice in what it spent",
-            "ENG-28",
+            "ENG-37",
             Injection::replace(
                 "tooling/review-run/src/cli.rs",
                 "&crate::spend::text(usage::charged(runs)),",
@@ -229,7 +230,7 @@ fn cap_cases() -> Vec<Case> {
         ),
         case(
             "review-run never keeping what the pull request's reviews spent",
-            "ENG-28",
+            "ENG-37",
             Injection::replace(
                 "tooling/review-run/src/spend.rs",
                 "    fs::rename(&part, path)\n",
@@ -240,7 +241,7 @@ fn cap_cases() -> Vec<Case> {
         ),
         case(
             "a spend file past its size limit read as what was spent",
-            "ENG-28",
+            "ENG-37",
             Injection::replace(
                 "tooling/review-run/src/spend.rs",
                 "    if text.len() > MAX_BYTES {",
@@ -259,14 +260,14 @@ fn carry_cases() -> Vec<Case> {
     vec![
         case(
             "a review never given what earlier reviews of its pull request spent",
-            "ENG-28",
+            "ENG-37",
             Injection::replace(WORKFLOW, " --spent-before \"$SPENT\" \\\n", " \\\n"),
             carry_check(),
             "as --spent-before",
         ),
         case(
             "the spend kept only by a review that did not fail or get cancelled",
-            "ENG-28",
+            "ENG-37",
             Injection::replace(
                 WORKFLOW,
                 "        if: always() && steps.scrub.outputs.scrubbed == 'true'\n        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2\n        with:\n          name: review-spend-pr-",
@@ -277,7 +278,7 @@ fn carry_cases() -> Vec<Case> {
         ),
         case(
             "what earlier reviews spent picked with no check of the run that uploaded it",
-            "ENG-28",
+            "ENG-37",
             Injection::replace(
                 SCRIPT,
                 "review-run -- previous select --of spend",
@@ -288,7 +289,7 @@ fn carry_cases() -> Vec<Case> {
         ),
         case(
             "what earlier reviews spent fetched and never read",
-            "ENG-28",
+            "ENG-37",
             Injection::replace(
                 SCRIPT,
                 "previous spend \"${files[@]}\"",

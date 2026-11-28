@@ -1,7 +1,8 @@
 ---
 title: "10.5 The review"
 summary: >-
-  The review (ENG-28) and its evaluation (ENG-32). Part of §10.
+  The review (ENG-28), what each review keeps for the next (ENG-37)
+  and its evaluation (ENG-32). Part of §10.
 ---
 # 10.5 The review
 
@@ -174,42 +175,6 @@ An agent whose gap recurred the same way in the tool's limit of resumes in a
 row, after the run that first had it, MUST NOT run again and MUST be named
 stalled in a blocking finding, as MUST a blocking finding kept in three reviews
 in a row with its cited file unchanged, as needing a stakeholder ruling.
-The review MUST carry the findings of the previous review of its pull request:
-each review whose review step and scrub step succeed MUST keep its tracked
-findings as an artifact named for the pull request, for 90 days, and the next
-review MUST fetch, before the Claude OAuth token is staged, the newest unexpired
-artifact of that name that a run of this repository's review workflow uploaded
-on its `workflow_run` or `issue_comment` trigger, which runs as the default
-branch defines it, and MUST pass it to the tool as the previous review's
-findings.
-An artifact of that name from any other run, since any workflow a pull request
-defines may upload one, MUST be refused and counted, and a findings file that is
-past 1 MiB or does not read MUST be named and not taken for an empty history;
-the review MUST say in its job summary which earlier review it carried or that
-it found none, so that no finding is silently counted new.
-Each review MUST keep what it spent as an artifact named for the pull request
-and its run's attempt, replacing none, for 90 days, however the review ended,
-and the next review MUST sum what every earlier review kept, an earlier attempt
-of its own run included, each fetched the same way and from the same origin as
-the previous review's findings, and pass the sum to the tool as what earlier
-reviews spent; a spend file that is past 1 KiB or does not read, or whose run
-cannot be looked up, MUST be named and not taken for zero, and the review MUST
-say in its job summary how many earlier reviews it summed and what they spent,
-or that it found none.
-A review a stakeholder's pull-request comment brought MUST run no agent when an
-earlier review of the same head, from a run whose spend it trusts, kept its
-review outcome under the same dispatch and left no gap: each review MUST keep
-its outcome, consulted agents, run id, gaps and dispatch among its reports, the
-comment's review MUST take them as its own, state the deterministic findings
-again and say in its job summary whether it reused one or ran its agents, and it
-MUST wait for a running review, cancelling none.
-A stakeholder's comment MUST change nothing an agent reads, since the comment's
-review takes the agents' outcome as its own: the review bundle MUST write the
-bundle and each review context the same whatever the comments say, MUST leave
-out of both every finding that turns on the stakeholder's consent (ENG-21,
-ENG-29, ENG-34), which the review gate alone weighs, MUST name the change's
-ENG-29 record whether or not a comment consents, and MUST tell each agent that
-consent is the review gate's check and no finding of its own.
 
 ## ENG-32
 
@@ -256,3 +221,45 @@ warning past a stated limit.
 Every review MUST leave a run list of its agent runs, each with its tokens, the
 cost its run log reported and why it was not accepted, and a run report built
 from it on which every string an agent's run shaped stands as escaped text.
+
+## ENG-37
+
+- Pri: P0
+- Ver: T
+
+The review MUST carry the findings of the previous review of its pull request:
+each review whose review step and scrub step succeed MUST keep its tracked
+findings as an artifact named for the pull request, for 90 days, and the next
+review MUST fetch, before the Claude OAuth token is staged, the newest unexpired
+artifact of that name that a run of this repository's review workflow uploaded
+on its `workflow_run` or `issue_comment` trigger, which runs as the default
+branch defines it, and MUST pass it to the tool that runs the review (ENG-28)
+as the previous review's findings.
+An artifact of that name from any other run, since any workflow a pull request
+defines may upload one, MUST be refused and counted, and a findings file that is
+past 1 MiB or does not read MUST be named and not taken for an empty history;
+the review MUST say in its job summary which earlier review it carried or that
+it found none, so that no finding is silently counted new.
+Each review MUST keep what it spent as an artifact named for the pull request
+and its run's attempt, replacing none, for 90 days, however the review ended,
+and the next review MUST sum what every earlier review kept, an earlier attempt
+of its own run included, each fetched the same way and from the same origin as
+the previous review's findings, and pass the sum to the tool as what earlier
+reviews spent; a spend file that is past 1 KiB or does not read, or whose run
+cannot be looked up, MUST be named and not taken for zero, and the review MUST
+say in its job summary how many earlier reviews it summed and what they spent,
+or that it found none.
+A review a stakeholder's pull-request comment brought MUST run no agent when an
+earlier review of the same head, from a run whose spend it trusts, kept its
+review outcome under the same dispatch and left no gap: each review MUST keep
+its outcome, consulted agents, run id, gaps and dispatch among its reports, the
+comment's review MUST take them as its own, state the deterministic findings
+again and say in its job summary whether it reused one or ran its agents, and it
+MUST wait for a running review, cancelling none.
+A stakeholder's comment MUST change nothing an agent reads, since the comment's
+review takes the agents' outcome as its own: the review bundle MUST write the
+bundle and each review context the same whatever the comments say, MUST leave
+out of both every finding that turns on the stakeholder's consent (ENG-21,
+ENG-29, ENG-34), which the review gate alone weighs, MUST name the change's
+ENG-29 record whether or not a comment consents, and MUST tell each agent that
+consent is the review gate's check and no finding of its own.

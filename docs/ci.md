@@ -65,7 +65,7 @@ is short, because a finding found late costs a whole round.
 - A pull request's reviews share one cost cap, ENG-28's, 5 USD counted
   over all of them: each review keeps what it spent in a
   `review-spend-pr-<N>-a<attempt>` artifact, and the next sums every one
-  into `review-run --spent-before`, up to 1000 of them, so reviews run
+  into `review-run --spent-before` (ENG-37), up to 1000 of them, so reviews run
   side by side, cancelled or rerun never erase each other's. A run
   starts only once its tier's cap, 0.30 USD for a specialist and 1.50
   for a generalist, fits beside

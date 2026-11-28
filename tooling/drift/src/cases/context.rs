@@ -4,7 +4,7 @@
 //! told to read neither its context nor away from the bundle, a context
 //! that leaves out what it promises, a context left out of the answer
 //! key, and a bundle or context that turns on the stakeholder's
-//! comments; and the stability measurement's finding overlap and
+//! comments (ENG-37); and the stability measurement's finding overlap and
 //! identity (ENG-32).
 
 use super::case;
@@ -199,7 +199,7 @@ pub(super) fn review_consent_cases() -> Vec<Case> {
     vec![
         case(
             "the review bundle showing an agent a finding that turns on the stakeholder's consent",
-            "ENG-28",
+            "ENG-37",
             Injection::replace(
                 RENDER,
                 "a.findings.iter().filter(|f| !a.on_consent.contains(f))",
@@ -210,7 +210,7 @@ pub(super) fn review_consent_cases() -> Vec<Case> {
         ),
         case(
             "the review bundle naming the ENG-29 record only once the stakeholder consents",
-            "ENG-28",
+            "ENG-37",
             Injection::replace(
                 "tooling/review-bundle/src/analysis.rs",
                 "        eng_29_record: guard.record,\n",
@@ -221,7 +221,7 @@ pub(super) fn review_consent_cases() -> Vec<Case> {
         ),
         case(
             "a specialist's context not saying that consent is the review gate's check",
-            "ENG-28",
+            "ENG-37",
             Injection::replace(
                 RENDER,
                 "    let _ = write!(b, \"\\n{CONSENT}\\n\");\n",

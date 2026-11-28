@@ -510,7 +510,7 @@ row: "- [{title}]({filename}) — {summary}"
 - [9.5 Command-line interface](09a-command-line-interface.md) — The `parinn` command-line interface: every command, the act and class each records, and the rules shared by all commands. Part of §9.
 - [9.7 Room vocabulary](09b-lane-vocabulary.md) — The one vocabulary every surface uses (VIEW-14): run status and freshness, room status, evidence and proof classes, the Needs you order, integrity status, trust marks and the keymap. Part of §9.
 - [10. Engineering quality (ENG)](10-engineering-quality.md) — Engineering quality requirements (ENG): code organisation, testing, static analysis, supply chain, and process. Those of the review continue in 10a.
-- [10.5 The review](10a-review-requirements.md) — The review (ENG-28) and its evaluation (ENG-32). Part of §10.
+- [10.5 The review](10a-review-requirements.md) — The review (ENG-28), what each review keeps for the next (ENG-37) and its evaluation (ENG-32). Part of §10.
 - [11. Verification and acceptance](11-verification-and-acceptance.md) — The evaluation plan with baselines and acceptance targets, and the definition of done for v1.0.
 - [12. Delivery plan](12-delivery-plan.md) — Milestone M0 spikes S1–S13 and milestones M1–M9 with their scope and exit criteria; what freezes each initial target.
 - [13. Open questions and risks](13-open-questions-and-risks.md) — Open questions OQ-01..58 with their resolution path, and the risk register with mitigations.

@@ -1,5 +1,6 @@
-//! ENG-28: a pull request's reviews share one cost cap. `review-run`
-//! counts what the pull request's earlier reviews spent, handed in as
+//! ENG-28: a pull request's reviews share one cost cap, and each keeps
+//! what it spent for the next (ENG-37). `review-run` counts what the
+//! pull request's earlier reviews spent, handed in as
 //! `--spent-before`, toward the cap, starts a run only once its tier's
 //! cap fits beside that, its own finished runs and the caps of its runs
 //! in flight, names each agent it did not start over budget

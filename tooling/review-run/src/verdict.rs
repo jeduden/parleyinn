@@ -1,4 +1,4 @@
-//! A review's verdict kept for a comment (ENG-28): a stakeholder's
+//! A review's verdict kept for a comment (ENG-37): a stakeholder's
 //! comment brings a review, since consent is a comment, and that review
 //! runs no agent when an earlier review of the same head already took
 //! every dispatched agent's answer. `review-run previous verdict` weighs

@@ -1,6 +1,6 @@
 #!/bin/bash
-# Fetches what the earlier reviews of the pull request spent, for
-# `review-run --spent-before`, which holds them all to one cost cap
+# Fetches what the earlier reviews of the pull request spent (ENG-37),
+# for `review-run --spent-before`, which holds them all to one cost cap
 # (ENG-28). Each review keeps what it spent alone, so this sums every
 # review's, each attempt of a run its own: `review-spend-pr-<N>-a<attempt>`,
 # so a rerun counts what its first attempt spent and replaces none. As

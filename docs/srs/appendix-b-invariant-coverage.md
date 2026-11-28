@@ -67,7 +67,7 @@ source, [§1.3](invariants.md).
 
 | Priority | Functional and security (§5–§6) | Engineering (§10, §10.5) |
 | -------- | ------------------------------- | ------------------------ |
-| P0       | 93                              | 32                       |
+| P0       | 93                              | 33                       |
 | P1       | 109                             | 2                        |
 | P2       | 38                              | 0                        |
 | —        | Non-functional (§7): 15         |                          |
