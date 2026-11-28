@@ -103,6 +103,8 @@ its evidence asks for today.
     whatever path it took (phase 12, ENG-28).
 13. A specialist whose recorded runs reached its turn budget gets one
     above the most turns they took (phase 13, ENG-28 and ENG-32).
+14. A derived defect plants one problem: the MUST it adds names its
+    requirement and serves only what it traces (phase 14, ENG-32).
 
 ## Execution
 
@@ -121,6 +123,7 @@ its evidence asks for today.
 | 11    | opus  | The ENG-28 context check finds ENG-28 quoted whole; two drift cases fail; lang-gherkin's cases pass in fewer turns  |
 | 12    | opus  | A read that climbs out of the pull request's tree to its diff, or a kept part's read where it ran, covers it        |
 | 13    | opus  | The five specialists' cases pass on their models with 30 turns, above the most any recorded run took                |
+| 14    | opus  | Each SRS specialist's cases pass on its model, the requests against the added MUST counted beside the old one's     |
 
 ## Phases
 
@@ -171,6 +174,8 @@ footer: |
 |     | ↳      | ENG-28's review now counts every read of a specialist's diff, by whatever path the file system resolves to it. The local review of §2, §5, §5a and §7 written as blocks had named two specialists' parts partial that read their whole diffs: one by a path that climbed out of the pull request's tree, two kept on a resume and read under the first run's work directory. A climb through a link the pull request plants still covers nothing. No requirement or instruction changes.                                                                        |
 | 13  | ✅     | [A specialist's turn budget sits above the turns its runs take](phase-13.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 |     | ↳      | The five specialists whose recorded runs reached their budget of 20 turns get 30, above the 26 the longest of them took: domain-model-hub, lang-markdown, lang-gherkin, test-engineer-unit and test-engineer-integration. The review of §2, §5, §5a and §7 written as blocks had named a part of the hub partial, cut off at 20 turns before it stated anything. No requirement or case changes.                                                                                                                                                                |
+| 14  | ✅     | [A derived defect plants one problem](phase-14.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+|     | ↳      | The case each SRS specialist gets for a MUST added with no change to its scenario adds a MUST that names its requirement and serves only what it traces. On the old sentence about two answers in five asked for the requirement to be fixed; on the new one none did. No requirement changes, and no scenario comes off @pending.                                                                                                                                                                                                                              |
 <?/catalog?>
 
 ## Acceptance Criteria
@@ -201,3 +206,5 @@ footer: |
       the path it read it by
 - [x] Every specialist's turn budget sits above the most turns a
       recorded run of it took
+- [x] A derived defect's MUST draws no request to fix its own wording or
+      traces
