@@ -2,8 +2,8 @@
 //! exists to rule out (ENG-32), apart from the registry's other cases
 //! so no file of it grows further: a world built without them, an
 //! instruction file among them put beside the agent, a link among them
-//! followed, and a path among them that leaves the tree written where
-//! it points.
+//! followed, one reached through a linked directory copied, and a path
+//! among them that leaves the tree written where it points.
 
 use super::case;
 use crate::{Case, Injection, cargo_lib_test};
@@ -46,14 +46,28 @@ pub(super) fn review_world_cases() -> Vec<Case> {
             "ENG-32",
             Injection::replace(
                 ADDED,
-                "!from.symlink_metadata().is_ok_and(|m| m.is_file())",
-                "!from.metadata().is_ok_and(|m| m.is_file())",
+                "tree.join(path).symlink_metadata()",
+                "tree.join(path).metadata()",
             ),
             cargo_lib_test(
                 "review-eval",
                 "added::tests::an_added_path_that_is_no_regular_file_is_left_out_and_noted",
             ),
             "an_added_path_that_is_no_regular_file_is_left_out_and_noted",
+        ),
+        case(
+            "a file the evaluated tree lists through a linked directory copied into an evaluation world",
+            "ENG-32",
+            Injection::replace(
+                ADDED,
+                ".all(|dir| is(dir, fs::Metadata::is_dir))",
+                ".all(|_| true)",
+            ),
+            cargo_lib_test(
+                "review-eval",
+                "added::tests::an_added_path_through_a_linked_directory_is_left_out_and_noted",
+            ),
+            "an_added_path_through_a_linked_directory_is_left_out_and_noted",
         ),
         case(
             "a path the evaluated tree lists outside itself written where it points",
