@@ -18,9 +18,9 @@
 
 use std::collections::BTreeMap;
 
-use review_eval::{component, runner};
+use review_eval::component;
 
-use crate::controls::Controls;
+use crate::controls::{Controls, Need};
 use crate::memo::{self, Answers};
 use crate::parts;
 use crate::pipeline::pipeline;
@@ -141,7 +141,7 @@ pub(crate) fn run_all(r: &Review, c: &Controls) -> Vec<AgentRun> {
             Task::Generalist(unit) => (Some(unit), true),
             Task::Merge(_) => (None, false),
         };
-        let fits = unit.is_none_or(|u| c.budget.fits(runner::budget_of(u.kind)));
+        let fits = unit.is_none_or(|u| c.budget.fits(Need::of(u.kind)));
         fits && (!generalist || c.breaker.decided())
     };
     let done = pipeline(&g.waits, r.options.parallel, &gate, &|at, inputs| {
@@ -207,7 +207,7 @@ fn task(r: &Review, c: &Controls, (task, before): (&Task, &Answers), inputs: Vec
             // keep it from starting, and the cap is what was set.
             let tripped = c
                 .budget
-                .refusal(runner::budget_of(unit.kind))
+                .refusal(Need::of(unit.kind))
                 .map_or_else(|| c.breaker.refusal(), |_| None);
             let done = match tripped {
                 Some(why) => {

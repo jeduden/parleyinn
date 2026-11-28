@@ -455,6 +455,37 @@ fn every_run_is_capped_at_its_tier_s_budget() {
 }
 
 #[test]
+fn a_generalist_s_reserve_is_half_its_cap_and_a_specialist_s_its_whole_cap() {
+    // Pinned as text, as the caps are.
+    assert_eq!(usd(reserve_of(Kind::Specialist)), "0.30");
+    assert_eq!(usd(reserve_of(Kind::Generalist)), "0.75");
+    assert_eq!(usd(reserve_of(Kind::Consultant)), "0.75");
+}
+
+#[test]
+fn a_command_is_capped_at_what_the_review_holds_for_it() {
+    let w = world("standard");
+    let log = PathBuf::from("/logs/run.jsonl");
+    let mut c = command(
+        &component(Kind::Generalist, "review-code"),
+        &w,
+        None,
+        &log,
+        Duration::from_secs(9),
+    );
+
+    cap(&mut c, 0.904);
+
+    assert!(has(&args_of(&c), ["--max-budget-usd", "0.90"]));
+    assert!(!args_of(&c).contains(&"1.50"));
+    // A command that passes no cap is left as it is.
+    let mut bare = Command::new("claude", &["-p", "x"], Path::new("/w"));
+    let before = bare.args.clone();
+    cap(&mut bare, 0.9);
+    assert_eq!(bare.args, before);
+}
+
+#[test]
 fn every_agent_is_refused_reads_outside_its_trees_and_of_the_process_files() {
     // Pinned as text: the process files hold every environment on the
     // machine, the review's own among them, and nothing outside the two

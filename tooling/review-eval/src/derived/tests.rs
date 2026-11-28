@@ -141,12 +141,14 @@ fn a_model_defect_cites_an_id_no_section_defines() {
         panic!("{:?}", case.edits);
     };
     assert_eq!((old.as_str(), new.as_str()), ("PIN-08", "PIN-99"));
-    // Known by its place and its form: a finding may name the swapped
-    // id by its line and not by its text, so the line it stands on is
-    // the place the case wants.
+    // Known by its place, its form and the id the citation means: a
+    // finding may name the swapped id by its line and not by its text,
+    // so the line it stands on is the place the case wants, and the
+    // missing id is no id a finding may cite.
     let missing = &case.expect.finding[0];
     assert_eq!(missing.form.as_deref(), Some("linked"));
     assert_eq!(missing.line, Some(3));
+    assert_eq!(missing.ids, vec!["PIN-08"]);
     assert!(missing.mentions.is_empty());
     let excluded = got
         .iter()

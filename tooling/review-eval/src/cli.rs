@@ -9,7 +9,7 @@
 //! of that token in the files a job keeps, failing closed when it found
 //! one (ENG-28).
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -27,7 +27,9 @@ use crate::log::RunLog;
 use crate::plan::{self, Planned};
 use crate::score::{CaseRecord, RunRecord, Scorecard, SuiteRecord, decided};
 use crate::secret::{self, Scrubber};
-use crate::{CASES, DEADLINE_SECONDS, check, compare, grade, published, runner, world};
+use crate::{
+    CASES, DEADLINE_SECONDS, check, compare, grade, published, requirements, runner, world,
+};
 
 /// Every case passed, or the command had nothing to fail on.
 pub const EXIT_OK: u8 = 0;
@@ -734,17 +736,19 @@ fn run_case(
     record
 }
 
-/// The report of a run as the review would read it from `log`, for the
-/// record: a run that did not run is headed so, and one cut off before
-/// it stated anything ends with the review's own outcome, never a clean
-/// pass.
-fn record_report(log: &RunLog) -> String {
-    use review_gate::report::{CUT_BEFORE_STATING, assemble, split, states_nothing, with_outcome};
+/// The report of a run as the review would read it from `log`, its ids
+/// held to `known`, for the record: a run that did not run is headed
+/// so, and one cut off before it stated anything ends with the review's
+/// own outcome, never a clean pass.
+fn record_report(log: &RunLog, known: &BTreeSet<String>) -> String {
+    use review_gate::report::{
+        CUT_BEFORE_STATING, assemble, split_with, states_nothing, with_outcome,
+    };
     if !log.ran() {
         let why = format!("its run ended with {}", log.subtype);
         return assemble(&log.texts, &log.answer, Some(&why));
     }
-    let clean = split(&assemble(&log.texts, &log.answer, None)).clean;
+    let clean = split_with(&assemble(&log.texts, &log.answer, None), Some(known)).clean;
     let ending = if !log.succeeded() && states_nothing(&log.texts, &log.answer) {
         CUT_BEFORE_STATING
     } else {
@@ -787,11 +791,14 @@ fn one_run(
             options.deadline,
         );
         let log = runner::run(host, &command)?;
+        // The ids a finding may cite, read from the world's two trees
+        // as the review reads them from its work directory.
+        let known = requirements::ids(&world.main)?;
         // The report as the review would read it from the log, for the
         // record, whatever result the run ended with.
         let report_path = dir.join("report.md");
-        let written = fs::write(&report_path, record_report(&log));
-        let graded = grade::grade(component, case, &log);
+        let written = fs::write(&report_path, record_report(&log, &known));
+        let graded = grade::grade(component, case, &log, &known);
         let mut record = RunRecord::new(&log, graded.failures, graded.slips);
         record.notes.clone_from(&world.notes);
         // A record that cannot be written fails no run, but it is noted

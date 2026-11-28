@@ -34,9 +34,9 @@ use crate::plan::{Plan, report_file};
 use crate::reading::ReportLine;
 use crate::run::AgentRun;
 
-/// Where a finding about the review itself points: the review's own
-/// directory, not a file of the change.
-pub const REVIEW_PATH: &str = "review/";
+mod errors;
+
+pub use review_gate::REVIEW_PATH;
 
 /// What the review decided, and what the gate holds it to.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -84,6 +84,7 @@ pub fn decide(
         closings,
         unread,
     } = weighed(plan, &weighings, (&answers, known), reports, &mut findings);
+    errors::name(runs, &unread, &mut findings);
     let consulted: BTreeSet<String> = answers.keys().cloned().collect();
     let mut not_reviewed = not_reviewed(runs, &silent, &refused, &unread);
     not_reviewed.extend(partial.iter().chain(&unreadable).cloned());
@@ -337,7 +338,7 @@ fn answers(
                     .unwrap_or_else(|| "it was not run".to_owned());
                 findings.push(blocking(
                     REVIEW_PATH,
-                    format!("{name} did not run ({why}), so the review is incomplete"),
+                    review_gate::left_out::did_not_run(&name, &why),
                 ));
                 silent.push(name);
             }
@@ -926,17 +927,17 @@ fn summary(counts: &Counts, named: &Named, closings: &[String]) -> String {
     if counts.cut > 0 {
         let _ = write!(
             s,
-            " {} ended without a successful result, cut off by a turn budget, deadline or \
-             cost cap, with every line of their diff read: what each one's log states is its \
-             report.",
+            " {} ended without a successful result, on a turn budget, a deadline, a cost cap \
+             or an error, with every line of their diff read: what each one's log states is \
+             its report.",
             counted(counts.cut, "specialist")
         );
     }
     if counts.cut_generalists > 0 {
         let _ = write!(
             s,
-            " {} ended without a successful result, cut off by a turn budget, deadline or \
-             cost cap: what each one's log states is its weighing.",
+            " {} ended without a successful result, on a turn budget, a deadline, a cost cap \
+             or an error: what each one's log states is its weighing.",
             counted(counts.cut_generalists, "generalist")
         );
     }

@@ -300,8 +300,8 @@ pub(super) fn review_control_cases() -> Vec<Case> {
             "ENG-28",
             Injection::replace(
                 "tooling/review-eval/src/runner.rs",
-                "[\"--max-budget-usd\".to_owned(), budget_usd(",
-                "[\"--max-budget\".to_owned(), budget_usd(",
+                "const BUDGET_FLAG: &str = \"--max-budget-usd\";",
+                "const BUDGET_FLAG: &str = \"--max-budget\";",
             ),
             controlled(),
             want,

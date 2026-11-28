@@ -34,6 +34,7 @@ pub fn scrub_runs(scrubber: &Scrubber, runs: &mut [AgentRun]) -> usize {
         }
         scrub(&mut run.log.subtype);
         scrub(&mut run.log.answer);
+        scrub(&mut run.log.error);
         run.log.texts.iter_mut().for_each(&mut scrub);
         run.log.writes.iter_mut().for_each(&mut scrub);
         run.failed_parts.iter_mut().for_each(|(_, why)| scrub(why));

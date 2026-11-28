@@ -88,7 +88,8 @@ requirement at 50 lines, through mdsmith's `max-section-length` on
 the srs kind, with those six listed at their length until each is
 split; phase 1 lands it. ENG-28's entry is 193, its length with the
 clause #161 adds, since its section is rewritten only after #161
-lands.
+lands. #154's two sentences take it to 202, which the stakeholder
+listed on 26 November 2026.
 
 The shape. The srs crate reads a block line by line, and mdsmith
 reads it as Markdown. On 22 November 2026 the stakeholder asked that
@@ -157,6 +158,9 @@ The review's agents MUST have no credential that can approve or write.
 6. Each requirement the srs kind lists past 50 lines is split into
    requirements that fit, each with its scenario, and leaves the
    list. One only shortened has its entry lowered to its length.
+   A split that changes no file the stakeholder owns leaves its entry
+   for the next change to `.mdsmith.yml`, which asks for consent
+   anyway (phase 18).
 
 ## Execution
 
@@ -179,6 +183,7 @@ The review's agents MUST have no credential that can approve or write.
 | 15    | sonnet | A requirement table fails the parse gate; the tests pass                                                                                                             |
 | 16    | sonnet | The tools, the scenarios and the docs say requirement; the tests pass                                                                                                |
 | 17    | sonnet | The review's agents say requirement; each one's cases pass on its model                                                                                              |
+| 18    | sonnet | SEC-31 fits in 50 lines, SEC-33 holds its receipt; the gates pass                                                                                                    |
 
 ## Phases
 
@@ -237,6 +242,8 @@ footer: |
 |     | ↳      | Where the tools, the scenarios and the docs called a requirement a row, or a section's requirements a table, they say requirement or block. The evaluation's derived case of a MUST added with no change to its scenario reads the requirement as a block alone. No requirement changes, and no scenario comes off @pending.                                                                                                                                                                                                              |
 | 17  | ✅     | [The review's agents say requirement](phase-17.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 |     | ↳      | The SRS specialists, the generalists for specification and code, lang-gherkin, performance, test-engineer-end-to-end and the report sections say requirement where they said row, and the threat model's specialist takes its final text. Each reviewer component the change reaches passes its cases on its model: the 42 the evaluation plans and the security persona it left to another. No requirement changes, and no scenario comes off @pending.                                                                                  |
+| 18  | ✅     | [SEC-31's purge receipt in a requirement of its own](phase-18.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+|     | ↳      | SEC-31's signed purge receipt is SEC-33, word for word, at the end of §6.2, so SEC-31 fits in 49 lines, under the srs kind's 50. Its scenario, Appendix B and C, the parse gate's count and the two citations of the receipt follow; no other citation of SEC-31 changes. No scenario comes off @pending.                                                                                                                                                                                                                                 |
 <?/catalog?>
 
 ## Acceptance Criteria

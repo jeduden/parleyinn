@@ -11,12 +11,11 @@ use std::time::Duration;
 
 use review_eval::component::Kind;
 use review_eval::log::RunLog;
-use review_eval::runner;
 use review_gate::report::{Problem, report_check};
 
 use crate::LOGS;
 use crate::backoff::{self, Class, MAX_ATTEMPTS};
-use crate::controls::{Controls, Reservation};
+use crate::controls::{Controls, Need, Reservation};
 use crate::live::Running;
 use crate::parts::add_usage;
 use crate::run::{AgentRun, Review, Unit, attempt, describe, keep_log, keep_spend, not_started};
@@ -186,10 +185,7 @@ fn again(
             }
             waited += 1;
         }
-        let held = match c
-            .budget
-            .reserve(runner::budget_of(unit.kind), r.options.deadline)
-        {
+        let held = match c.budget.reserve(Need::of(unit.kind), r.options.deadline) {
             Ok(held) => held,
             Err(why) => {
                 let (mut run, report) = last;
@@ -215,21 +211,19 @@ fn again(
     }
 }
 
-/// Runs `unit` once, with `note`, once its tier's cap is reserved in
-/// the pull request's cost cap, and not at all when it can never be.
+/// Runs `unit` once, with `note`, once what it may spend is reserved
+/// in the pull request's cost cap, and not at all when it can never
+/// be.
 fn tried(r: &Review, c: &Controls, unit: &Unit, note: Option<&str>) -> (AgentRun, Option<String>) {
-    match c
-        .budget
-        .reserve(runner::budget_of(unit.kind), r.options.deadline)
-    {
+    match c.budget.reserve(Need::of(unit.kind), r.options.deadline) {
         Ok(held) => ran(r, c, unit, note, held),
         Err(why) => not_started(r.workdir, unit, why),
     }
 }
 
-/// Runs `unit` once, with `note`, its tier's cap `held`: noted as
-/// running while it runs, and charged once it ends what [`billed`]
-/// says, its reservation released.
+/// Runs `unit` once, with `note`, capped at what it `held` of the pull
+/// request's cap: noted as running while it runs, and charged once it
+/// ends what [`billed`] says, its reservation released.
 fn ran(
     r: &Review,
     c: &Controls,
@@ -249,11 +243,11 @@ fn ran(
     let mut done = attempt(
         (r.host, r.workdir, r.plan),
         unit,
-        (r.options.deadline, r.known),
+        (r.options.deadline, r.known, held.held()),
         note,
     );
     c.live.end(&label);
-    done.0.charged = billed(&done.0.log, runner::budget_of(unit.kind));
+    done.0.charged = billed(&done.0.log, held.held());
     held.charge(done.0.charged, &|spent| keep_spend(r, spent));
 
     done

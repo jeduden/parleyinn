@@ -1,7 +1,7 @@
 ---
 title: "6. Security"
 summary: >-
-  The normative security requirements SEC-01..32, SEC-28 in 06b. The
+  The normative security requirements SEC-01..33, SEC-28 in 06b. The
   threat model is in 06a, and the boundary register in 06b.
 ---
 # 6. Security
@@ -550,10 +550,6 @@ Purge changes only ParleyInn's own record of a source, its ingest position's
 hash and recorded positions, never the harness's transcript file.
 Purge MUST erase the range from every backup ParleyInn made, or list each such
 backup.
-Each node MUST write a signed purge receipt the node's principal can collect:
-the scope, the ranges, the copies erased, and every copy ParleyInn knows of and
-cannot erase (harness transcript files, exported bundles, backups, and peers
-that refused or are unreachable).
 
 ### SEC-32
 
@@ -585,3 +581,14 @@ principal has recorded no trust grant for its principal (OWN-29).
 Every pin version the facilitator writes MUST likewise be in its own words only,
 quoting or embedding no marked range, so no trust grant restores a third party's
 text through it (OWN-29).
+
+### SEC-33
+
+- Pri: P0
+- Ver: T
+- Traces: I1, I6
+
+Each node MUST write a signed purge receipt the node's principal can collect:
+the scope, the ranges, the copies erased, and every copy ParleyInn knows of and
+cannot erase (harness transcript files, exported bundles, backups, and peers
+that refused or are unreachable).
