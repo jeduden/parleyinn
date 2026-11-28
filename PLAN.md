@@ -88,4 +88,5 @@ empty: |
 | 2611020828 | 🔳     | opus   | [Review convergence: rulings settle, contests are checkable, a fresh reader paraphrases](plan/2611020828_review-convergence/plan.md) |
 | 2611190753 | 🔳     | opus   | [Review stability: the open options, each with its tests](plan/2611190753_review-stability-options/plan.md)                          |
 | 2611211544 | 🔳     | opus   | [Each SRS requirement under its own heading, in short lines](plan/2611211544_srs-requirement-blocks/plan.md)                         |
+| 2611280904 | 🔲     | opus   | [Checks and review on the editing node, verified on GitHub](plan/2611280904_review-receipts/plan.md)                                 |
 <?/catalog?>
