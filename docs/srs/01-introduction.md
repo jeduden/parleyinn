@@ -44,6 +44,15 @@ before its discussion or pull-request review
 comments appear in the conversation. A person can respond
 there and explicitly send the response to the forge.
 
+ParleyInn's way of working keeps a change fast and its overhead low by
+not doing settled work twice. An agent recalls what it already found
+instead of deriving it again. A result of a check keeps the evidence it
+rests on, bound to the tree it ran on, so that check need not run again
+on a tree it already ran on. Reuse never raises a result's evidence
+class, never skips a check a requirement or the forge's branch
+protection requires, and always shows what was reused and what ran
+fresh.
+
 Existing tools treat memory as a convenience feature and add security
 afterwards. ParleyInn treats the store as security-critical infrastructure from
 the first line of code. Where usefulness and safety conflict, ParleyInn chooses
