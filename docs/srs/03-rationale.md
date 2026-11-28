@@ -48,5 +48,5 @@ maps every individual concern to requirements.
    2026), a change of three rounds is estimated at about 37 minutes, most of
    it checks and review run again in full each round on GitHub. Running them
    once, on the node where the agent edits, is estimated at about 23
-   minutes, and about 18 once each check names the files it reads. → The reuse rule of
-   §1.2, whose requirements plan 2611280904 adds.
+   minutes, and about 18 once each check names the files it reads. → The
+   reuse rule of §1.2, whose requirements plan 2611280904 adds.
