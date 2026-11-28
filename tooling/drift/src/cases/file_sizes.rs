@@ -24,9 +24,9 @@ fn size_list_cases() -> Vec<Case> {
         case(
             "a file past its limit dropped from the size list",
             "ENG-34",
-            Injection::replace(SIZE_LIST, "crates/store/src/lib.rs 2116\n", ""),
+            Injection::replace(SIZE_LIST, "features/lane.feature 596\n", ""),
             scenario("ENG-34"),
-            "crates/store/src/lib.rs holds 2116 lines, past the limit of 1000 for Rust",
+            "features/lane.feature holds 596 lines, past the limit of 500 for Gherkin",
         ),
         case(
             "a listed file grown past its listed size",
@@ -55,8 +55,8 @@ fn size_list_cases() -> Vec<Case> {
             "ENG-34",
             Injection::replace(
                 SIZE_LIST,
-                "tooling/testkit/src/boundary/tests.rs 1015",
-                "tooling/testkit/src/boundary/tests.rs 1015\ntooling/drift/src/lib.rs 1200",
+                ".github/workflows/ci.yml 936",
+                ".github/workflows/ci.yml 936\ntooling/drift/src/lib.rs 1200",
             ),
             scenario("ENG-34"),
             "tooling/drift/src/lib.rs now fits its limit",
@@ -66,8 +66,8 @@ fn size_list_cases() -> Vec<Case> {
             "ENG-34",
             Injection::replace(
                 SIZE_LIST,
-                "tooling/testkit/src/boundary/tests.rs 1015",
-                "tooling/testkit/src/boundary/tests.rs 1015\ncrates/store/src/gone.rs 1100",
+                ".github/workflows/ci.yml 936",
+                ".github/workflows/ci.yml 936\ncrates/store/src/gone.rs 1100",
             ),
             scenario("ENG-34"),
             "crates/store/src/gone.rs is listed in tooling/engineering/oversize.txt but is gone",

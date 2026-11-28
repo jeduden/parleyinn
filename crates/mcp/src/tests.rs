@@ -9,6 +9,7 @@ use testkit::TempDir;
 
 mod erasure_calls;
 mod recall_calls;
+mod recall_scopes;
 mod search_calls;
 
 struct Fixture {
